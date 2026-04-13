@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% set active_page = "dashboard" %}
+
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard Overview{% endblock %}
+
+{% block content %}
+<!-- Stat Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">Total Customer</div>
+                    <div class="stat-value">{{ total_customers }}</div>
+                </div>
+                <div class="stat-icon" style="background: #4f46e5;">
+                    <i class="bi bi-people-fill"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">Total Agent</div>
+                    <div class="stat-value">{{ total_agents }}</div>
+                </div>
+                <div class="stat-icon" style="background: #06b6d4;">
+                    <i class="bi bi-person-badge-fill"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">Collection Hari Ini</div>
+                    <div class="stat-value">{{ collections_today }}</div>
+                </div>
+                <div class="stat-icon" style="background: #10b981;">
+                    <i class="bi bi-check-circle-fill"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">Pending VA</div>
+                    <div class="stat-value text-warning">{{ pending_va }}</div>
+                </div>
+                <div class="stat-icon" style="background: #f59e0b;">
+                    <i class="bi bi-credit-card-fill"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Status Breakdown -->
+<div class="row g-3 mb-4">
+    <div class="col-md-8">
+        <div class="table-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-bar-chart me-2"></i>Status Customer</span>
+            </div>
+            <div class="p-3">
+                <div class="row g-2">
+                    <div class="col-md-3">
+                        <div class="border rounded p-3 text-center">
+                            <div class="fw-bold fs-4 text-danger">{{ belum }}</div>
+                            <small class="text-muted">Belum</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3 text-center">
+                            <div class="fw-bold fs-4 text-warning">{{ janji_bayar }}</div>
+                            <small class="text-muted">Janji Bayar</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3 text-center">
+                            <div class="fw-bold fs-4 text-success">{{ bayar }}</div>
+                            <small class="text-muted">Bayar</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3 text-center">
+                            <div class="fw-bold fs-4 text-secondary">{{ tidak_ketemu }}</div>
+                            <small class="text-muted">Tidak Ketemu</small>
+                        </div>
+                    </div>
+                </div>
+
+                {% if total_customers > 0 %}
+                <div class="progress mt-3" style="height: 12px; border-radius: 8px;">
+                    {% set belum_pct = (belum / total_customers * 100) if total_customers > 0 else 0 %}
+                    {% set janji_pct = (janji_bayar / total_customers * 100) if total_customers > 0 else 0 %}
+                    {% set bayar_pct = (bayar / total_customers * 100) if total_customers > 0 else 0 %}
+                    {% set tk_pct = (tidak_ketemu / total_customers * 100) if total_customers > 0 else 0 %}
+                    <div class="progress-bar bg-danger" style="width: {{ belum_pct }}%" title="Belum"></div>
+                    <div class="progress-bar bg-warning" style="width: {{ janji_pct }}%" title="Janji Bayar"></div>
+                    <div class="progress-bar bg-success" style="width: {{ bayar_pct }}%" title="Bayar"></div>
+                    <div class="progress-bar bg-secondary" style="width: {{ tk_pct }}%" title="Tidak Ketemu"></div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="table-card h-100">
+            <div class="card-header">
+                <i class="bi bi-lightning me-2"></i>Quick Actions
+            </div>
+            <div class="p-3">
+                <a href="/customers" class="btn btn-outline-primary w-100 mb-2">
+                    <i class="bi bi-people me-2"></i>Kelola Customer
+                </a>
+                <a href="/va-requests?status=pending" class="btn btn-outline-warning w-100 mb-2">
+                    <i class="bi bi-credit-card me-2"></i>VA Pending ({{ pending_va }})
+                </a>
+                <a href="/activity-logs" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-clock-history me-2"></i>Activity Logs
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="table-card">
+    <div class="card-header">
+        <i class="bi bi-clock-history me-2"></i>Aktivitas Terbaru
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Detail</th>
+                    <th>Waktu</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in recent_logs %}
+                <tr>
+                    <td><strong>{{ log.user_name }}</strong></td>
+                    <td><span class="badge bg-secondary">{{ log.action }}</span></td>
+                    <td class="text-muted small">{{ log.detail or '-' }}</td>
+                    <td class="text-muted small">{{ log.timestamp.strftime('%d/%m %H:%M') if log.timestamp else '-' }}</td>
+                </tr>
+                {% endfor %}
+                {% if not recent_logs %}
+                <tr><td colspan="4" class="text-center text-muted py-4">Belum ada aktivitas</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

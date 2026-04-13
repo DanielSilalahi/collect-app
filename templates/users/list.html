@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}User Management{% endblock %}
+{% block page_title %}User Management{% endblock %}
+
+{% block content %}
+<div class="row mb-4 align-items-center">
+    <div class="col-md-6">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
+            <i class="bi bi-person-plus me-2"></i> Tambah User/Agent
+        </button>
+    </div>
+</div>
+
+<div class="card bg-white border-0 shadow-sm rounded-4">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">No</th>
+                        <th>Nama</th>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Phone</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr>
+                        <td class="ps-4 text-muted">{{ loop.index }}</td>
+                        <td class="fw-medium">{{ u.name }}</td>
+                        <td>{{ u.username }}</td>
+                        <td>
+                            {% if u.role == 'admin' %}
+                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle px-2 py-1 rounded-pill">Admin</span>
+                            {% else %}
+                            <span class="badge bg-info bg-opacity-10 text-info border border-info-subtle px-2 py-1 rounded-pill">Agent</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted">{{ u.phone or '-' }}</td>
+                        <td>
+                            {% if u.is_active %}
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success-subtle px-2 py-1 rounded-pill">Aktif</span>
+                            {% else %}
+                            <span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle px-2 py-1 rounded-pill">Nonaktif</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <i class="bi bi-people d-block mb-3 fs-2"></i>
+                            Belum ada user.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Add User -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold">Tambah User/Agent Baru</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/users/add">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Nama Lengkap</label>
+                        <input type="text" name="name" class="form-control" required placeholder="Contoh: Budi Gunawan">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Username</label>
+                        <input type="text" name="username" class="form-control" required placeholder="Gunakan tanpa spasi, contoh: budi123">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Password</label>
+                        <input type="password" name="password" class="form-control" required placeholder="Minimal 6 karakter">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Nomor Telepon</label>
+                        <input type="text" name="phone" class="form-control" placeholder="Contoh: 08123456789 (Opsional)">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Role / Hak Akses</label>
+                        <select name="role" class="form-select">
+                            <option value="agent">Agent Lapangan</option>
+                            <option value="admin">Dashboard Admin</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary px-4">Simpan User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

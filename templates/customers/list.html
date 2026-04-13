@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% set active_page = "customers" %}
+
+{% block title %}Customers{% endblock %}
+{% block page_title %}Customer Management{% endblock %}
+
+{% block content %}
+<!-- Header / Back Button -->
+<div class="row mb-3 align-items-center">
+    <div class="col-auto">
+        <a href="/customers" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Kembali ke Daftar Batch
+        </a>
+    </div>
+    <div class="col">
+        <h5 class="mb-0 text-muted ms-2">Batch: {{ batch_code if batch_code != 'manual' else 'Input Manual / Tanpa Batch' }}</h5>
+    </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+    <form method="GET" action="" class="row g-2 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold">Cari Nama</label>
+            <input type="text" class="form-control form-control-sm" name="search" value="{{ search }}" placeholder="Cari customer...">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold">Status</label>
+            <select class="form-select form-select-sm" name="status">
+                <option value="">Semua</option>
+                <option value="belum" {% if status_filter == 'belum' %}selected{% endif %}>Belum</option>
+                <option value="janji_bayar" {% if status_filter == 'janji_bayar' %}selected{% endif %}>Janji Bayar</option>
+                <option value="bayar" {% if status_filter == 'bayar' %}selected{% endif %}>Bayar</option>
+                <option value="tidak_ketemu" {% if status_filter == 'tidak_ketemu' %}selected{% endif %}>Tidak Ketemu</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold">Agent</label>
+            <select class="form-select form-select-sm" name="agent_id">
+                <option value="">Semua Agent</option>
+                {% for agent in agents %}
+                <option value="{{ agent.id }}" {% if agent_filter|string == agent.id|string %}selected{% endif %}>{{ agent.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-primary btn-sm w-100">
+                <i class="bi bi-search me-1"></i>Filter
+            </button>
+        </div>
+        <div class="col-md-3 text-end d-flex justify-content-end gap-1">
+            <button type="button" class="btn btn-outline-danger btn-sm" id="bulkDeleteBtn" disabled onclick="submitBulkDelete('/customers/bulk-delete')">
+                <i class="bi bi-trash me-1"></i>Hapus (<span id="deleteCount">0</span>)
+            </button>
+            <button type="button" class="btn btn-info btn-sm" id="bulkAssignBtn" disabled data-bs-toggle="modal" data-bs-target="#assignModal">
+                <i class="bi bi-person-check me-1"></i>Assign (<span id="selectedCount">0</span>)
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Customer Table -->
+<div class="table-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-people me-2"></i>Daftar Customer ({{ total }})</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th><input type="checkbox" id="selectAll" class="form-check-input"></th>
+                    <th>Nama</th>
+                    <th>Alamat</th>
+                    <th>Phone</th>
+                    <th>Agent</th>
+                    <th>Status</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in customers %}
+                <tr>
+                    <td><input type="checkbox" class="form-check-input row-checkbox" value="{{ c.id }}"></td>
+                    <td><strong>{{ c.name }}</strong></td>
+                    <td class="small text-muted" style="max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ c.address or '-' }}</td>
+                    <td class="small">{{ c.phone or '-' }}</td>
+                    <td class="small">{{ c.agent.name if c.agent else '<span class="text-muted">Belum assign</span>' | safe }}</td>
+                    <td>
+                        <span class="badge badge-{{ c.status }}">{{ c.status | replace('_', ' ') | title }}</span>
+                    </td>
+                    <td>
+                        <button class="btn btn-outline-info btn-sm me-1" data-bs-toggle="modal" data-bs-target="#detailModal{{ c.id }}" title="Detail">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="confirmDelete('/customers/{{ c.id }}/delete', '{{ c.name }}')" title="Hapus">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not customers %}
+                <tr><td colspan="7" class="text-center text-muted py-4">Tidak ada data customer</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="p-3 border-top">
+        <nav>
+            <ul class="pagination pagination-sm justify-content-center mb-0">
+                <li class="page-item {% if page == 1 %}disabled{% endif %}">
+                    <a class="page-link" href="?page={{ page - 1 }}&status={{ status_filter or '' }}&agent_id={{ agent_filter or '' }}&search={{ search }}">&laquo;</a>
+                </li>
+                {% for p in range(1, total_pages + 1) %}
+                {% if p <= 3 or p > total_pages - 3 or (p >= page - 1 and p <= page + 1) %}
+                <li class="page-item {% if p == page %}active{% endif %}">
+                    <a class="page-link" href="?page={{ p }}&status={{ status_filter or '' }}&agent_id={{ agent_filter or '' }}&search={{ search }}">{{ p }}</a>
+                </li>
+                {% elif p == 4 or p == total_pages - 3 %}
+                <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+                {% endfor %}
+                <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+                    <a class="page-link" href="?page={{ page + 1 }}&status={{ status_filter or '' }}&agent_id={{ agent_filter or '' }}&search={{ search }}">&raquo;</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Customer Detail Modals -->
+{% for c in customers %}
+<div class="modal fade" id="detailModal{{ c.id }}" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-person-lines-fill me-2"></i>Detail Nasabah</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="small text-muted fw-bold">Nama</label>
+                        <div>{{ c.name }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="small text-muted fw-bold">No. Telepon</label>
+                        <div>{{ c.phone or '-' }}</div>
+                    </div>
+                    <div class="col-md-12 mb-3">
+                        <label class="small text-muted fw-bold">Alamat</label>
+                        <div>{{ c.address or '-' }}</div>
+                    </div>
+                    
+                    <div class="col-12"><hr class="my-2"></div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="small text-muted fw-bold">Platform / Aplikasi</label>
+                        <div>{{ c.platform_name or '-' }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="small text-muted fw-bold">Nomor Pinjaman (Loan Number)</label>
+                        <div>{{ c.loan_number or '-' }}</div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="small text-muted fw-bold">Tagihan (Outstanding)</label>
+                        <div>{{ ("Rp {:,}".format(c.outstanding_amount)) if c.outstanding_amount else '-' }}</div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="small text-muted fw-bold">Overdue (Hari)</label>
+                        <div>{{ c.overdue_days if c.overdue_days != None else '-' }}</div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="small text-muted fw-bold">Tanggal Jatuh Tempo</label>
+                        <div>{{ c.due_date.strftime('%d/%m/%Y') if c.due_date else '-' }}</div>
+                    </div>
+
+                    <div class="col-12"><hr class="my-2"></div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="small text-muted fw-bold">Kontak Darurat 1</label>
+                        <div>{{ c.emergency_contact_1_name or '-' }} <br><span class="text-muted">{{ c.emergency_contact_1_phone or '-' }}</span></div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="small text-muted fw-bold">Kontak Darurat 2</label>
+                        <div>{{ c.emergency_contact_2_name or '-' }} <br><span class="text-muted">{{ c.emergency_contact_2_phone or '-' }}</span></div>
+                    </div>
+
+                    <div class="col-12"><hr class="my-2"></div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="small text-muted fw-bold">Koordinat GPS</label>
+                        <div>
+                            {% if c.lat and c.lng %}
+                            <a href="https://www.google.com/maps/search/?api=1&query={{ c.lat }},{{ c.lng }}" target="_blank" class="text-decoration-none">
+                                <i class="bi bi-geo-alt-fill text-danger me-1"></i>{{ c.lat }}, {{ c.lng }}
+                            </a>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="small text-muted fw-bold">Catatan Data Nasabah</label>
+                        <div>{{ c.notes or '-' }}</div>
+                    </div>
+
+                    <!-- Visit Logs Section -->
+                    <div class="col-12 mt-3 mb-2">
+                        <h6 class="fw-bold text-primary mb-3"><i class="bi bi-journal-check me-2"></i>Histori Kunjungan Lapangan</h6>
+                        {% if c.collections %}
+                            <div class="border rounded bg-light" style="max-height: 400px; overflow-y: auto;">
+                                <div class="list-group list-group-flush">
+                                    {% for col in c.collections|sort(attribute='timestamp', reverse=True) %}
+                                    <div class="list-group-item bg-transparent px-3 py-3 {% if not loop.last %}border-bottom{% endif %}">
+                                    <div class="d-flex w-100 justify-content-between mb-1">
+                                        <h6 class="mb-0 fw-bold"><i class="bi bi-person-badge text-muted me-1"></i>{{ col.agent.name if col.agent else 'Unknown Agent' }}</h6>
+                                        <small class="text-muted"><i class="bi bi-clock_history me-1"></i>{{ col.timestamp.strftime('%d %b %Y, %H:%M') if col.timestamp else col.created_at.strftime('%d %b %Y') }}</small>
+                                    </div>
+                                    <div class="mb-2 mt-2">
+                                        <span class="badge badge-{{ col.status }} bg-opacity-75">{{ col.status | replace('_', ' ') | title }}</span>
+                                    </div>
+                                    <p class="mb-2 small"><strong>Laporan/Keterangan:</strong><br>{{ col.notes or '-' }}</p>
+                                    {% if col.photo_url %}
+                                    <div class="mt-2 mb-2">
+                                        <a href="{{ col.photo_url }}" target="_blank">
+                                            <img src="{{ col.photo_url }}" alt="Bukti Kunjungan" class="img-thumbnail shadow-sm rounded" style="max-height: 125px; object-fit: cover;">
+                                        </a>
+                                        <div class="small text-muted mt-1" style="font-size: 0.70rem;">Klik foto untuk memperbesar</div>
+                                    </div>
+                                    {% endif %}
+                                    <div class="mt-2">
+                                        {% if col.gps_lat and col.gps_lng %}
+                                        <a href="https://www.google.com/maps/search/?api=1&query={{ col.gps_lat }},{{ col.gps_lng }}" target="_blank" class="small text-decoration-none">
+                                            <i class="bi bi-geo-alt-fill text-danger me-1"></i>Buka Peta Lokasi Kunjungan
+                                        </a>
+                                        {% else %}
+                                        <span class="small text-muted"><i class="bi bi-geo me-1"></i>Lokasi GPS tidak tercatat</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-light border small text-center text-muted mb-0 mt-2">
+                                <i class="bi bi-inbox me-1"></i> Belum ada histori kunjungan lapangan (Visit) untuk nasabah ini.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Assign Modal -->
+<div class="modal fade" id="assignModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-person-check me-2"></i>Assign ke Agent</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/customers/assign" id="assignForm">
+                <input type="hidden" name="customer_ids" id="assignCustomerIds">
+                <div class="modal-body">
+                    <p class="small text-muted">Customer yang dipilih akan di-assign ke agent yang dipilih.</p>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Pilih Agent</label>
+                        <select class="form-select" name="agent_id" required>
+                            <option value="">-- Pilih Agent --</option>
+                            {% for agent in agents %}
+                            <option value="{{ agent.id }}">{{ agent.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-primary" onclick="submitAssign()"><i class="bi bi-check me-1"></i>Assign</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

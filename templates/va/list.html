@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% set active_page = "va_requests" %}
+
+{% block title %}VA Requests{% endblock %}
+{% block page_title %}VA Request Management{% endblock %}
+
+{% block content %}
+<!-- Summary -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">Total VA Request</div>
+                    <div class="stat-value">{{ total }}</div>
+                </div>
+                <div class="stat-icon" style="background: #4f46e5;">
+                    <i class="bi bi-credit-card-fill"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">Pending</div>
+                    <div class="stat-value text-warning">{{ pending_count }}</div>
+                </div>
+                <div class="stat-icon" style="background: #f59e0b;">
+                    <i class="bi bi-hourglass-split"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="stat-label">Completed</div>
+                    <div class="stat-value text-success">{{ completed_count }}</div>
+                </div>
+                <div class="stat-icon" style="background: #10b981;">
+                    <i class="bi bi-check-circle-fill"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filter -->
+<div class="filter-bar">
+    <form method="GET" action="/va-requests" class="d-flex gap-2 align-items-end">
+        <div>
+            <label class="form-label small fw-semibold mb-1">Status</label>
+            <select class="form-select form-select-sm" name="status" onchange="this.form.submit()">
+                <option value="">Semua</option>
+                <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+                <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Completed</option>
+            </select>
+        </div>
+    </form>
+</div>
+
+<!-- VA Requests Table -->
+<div class="table-card">
+    <div class="card-header">
+        <i class="bi bi-credit-card me-2"></i>Daftar VA Request
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Customer</th>
+                    <th>Agent</th>
+                    <th>Notes</th>
+                    <th>Status</th>
+                    <th>VA Number</th>
+                    <th>Tanggal</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vr in va_requests %}
+                <tr>
+                    <td>{{ vr.id }}</td>
+                    <td><strong>{{ vr.customer.name if vr.customer else '-' }}</strong></td>
+                    <td>{{ vr.agent.name if vr.agent else '-' }}</td>
+                    <td class="small text-muted">{{ vr.notes or '-' }}</td>
+                    <td><span class="badge badge-{{ vr.status }}">{{ vr.status | title }}</span></td>
+                    <td>
+                        {% if vr.va_data %}
+                        <span class="fw-bold text-primary">{{ vr.va_data.va_number }}</span>
+                        <br><small class="text-muted">{{ vr.va_data.bank_name }}{% if vr.va_data.amount %} · Rp {{ "{:,.0f}".format(vr.va_data.amount) }}{% endif %}</small>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="small text-muted">{{ vr.created_at.strftime('%d/%m/%Y %H:%M') if vr.created_at else '-' }}</td>
+                    <td>
+                        {% if vr.status == 'pending' %}
+                        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createVaModal{{ vr.id }}">
+                            <i class="bi bi-plus-circle me-1"></i>Create VA
+                        </button>
+                        {% else %}
+                        <span class="text-success small"><i class="bi bi-check-circle"></i> Done</span>
+                        {% endif %}
+                    </td>
+                </tr>
+
+                {% if vr.status == 'pending' %}
+                <!-- Create VA Modal -->
+                <div class="modal fade" id="createVaModal{{ vr.id }}" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title"><i class="bi bi-credit-card me-2"></i>Create VA untuk {{ vr.customer.name if vr.customer else 'Customer' }}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <form method="POST" action="/va-requests/{{ vr.id }}/create-va">
+                                <div class="modal-body">
+                                    {% if vr.notes %}
+                                    <div class="alert alert-info small py-2">
+                                        <strong>Catatan agent:</strong> {{ vr.notes }}
+                                    </div>
+                                    {% endif %}
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">VA Number</label>
+                                        <input type="text" class="form-control" name="va_number" placeholder="Masukkan nomor VA" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">Bank</label>
+                                        <select class="form-select" name="bank_name" required>
+                                            <option value="">-- Pilih Bank --</option>
+                                            <option value="BCA">BCA</option>
+                                            <option value="BNI">BNI</option>
+                                            <option value="BRI">BRI</option>
+                                            <option value="Mandiri">Mandiri</option>
+                                            <option value="CIMB">CIMB Niaga</option>
+                                            <option value="Permata">Permata</option>
+                                            <option value="Danamon">Danamon</option>
+                                            <option value="BSI">BSI</option>
+                                            <option value="Other">Lainnya</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">Amount (Rp) — opsional</label>
+                                        <input type="number" class="form-control" name="amount" placeholder="0">
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                                    <button type="submit" class="btn btn-primary"><i class="bi bi-check me-1"></i>Create VA</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% endfor %}
+                {% if not va_requests %}
+                <tr><td colspan="8" class="text-center text-muted py-4">Tidak ada VA request</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="p-3 border-top">
+        <nav>
+            <ul class="pagination pagination-sm justify-content-center mb-0">
+                <li class="page-item {% if page == 1 %}disabled{% endif %}">
+                    <a class="page-link" href="?page={{ page - 1 }}&status={{ status_filter or '' }}">&laquo;</a>
+                </li>
+                {% for p in range(1, total_pages + 1) %}
+                <li class="page-item {% if p == page %}active{% endif %}">
+                    <a class="page-link" href="?page={{ p }}&status={{ status_filter or '' }}">{{ p }}</a>
+                </li>
+                {% endfor %}
+                <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+                    <a class="page-link" href="?page={{ page + 1 }}&status={{ status_filter or '' }}">&raquo;</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

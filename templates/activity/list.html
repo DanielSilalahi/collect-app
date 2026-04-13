@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% set active_page = "activity" %}
+
+{% block title %}Activity Logs{% endblock %}
+{% block page_title %}Activity Logs{% endblock %}
+
+{% block content %}
+<!-- Filter Bar -->
+<div class="filter-bar">
+    <form method="GET" action="/activity-logs" class="row g-2 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold">Action Type</label>
+            <select class="form-select form-select-sm" name="action">
+                <option value="">Semua</option>
+                {% for at in action_types %}
+                <option value="{{ at }}" {% if action_filter == at %}selected{% endif %}>{{ at }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold">User</label>
+            <select class="form-select form-select-sm" name="user_id">
+                <option value="">Semua User</option>
+                {% for u in users %}
+                <option value="{{ u.id }}" {% if user_filter|string == u.id|string %}selected{% endif %}>{{ u.name }} ({{ u.role }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-primary btn-sm w-100">
+                <i class="bi bi-search me-1"></i>Filter
+            </button>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="/activity-logs/export?action={{ action_filter or '' }}&user_id={{ user_filter or '' }}" class="btn btn-success btn-sm">
+                <i class="bi bi-download me-1"></i>Export Excel
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- Logs Table -->
+<div class="table-card">
+    <div class="card-header">
+        <i class="bi bi-clock-history me-2"></i>Activity Logs ({{ total }})
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Waktu</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Detail</th>
+                    <th>IP</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td class="small text-muted text-nowrap">{{ log.timestamp.strftime('%d/%m/%Y %H:%M:%S') if log.timestamp else '-' }}</td>
+                    <td><strong>{{ log.user.name if log.user else '-' }}</strong><br><small class="text-muted">{{ log.user.role if log.user else '' }}</small></td>
+                    <td><span class="badge bg-secondary">{{ log.action }}</span></td>
+                    <td class="small" style="max-width: 400px; word-break: break-word;">{{ log.detail or '-' }}</td>
+                    <td class="small text-muted">{{ log.ip_address or '-' }}</td>
+                </tr>
+                {% endfor %}
+                {% if not logs %}
+                <tr><td colspan="5" class="text-center text-muted py-4">Tidak ada log aktivitas</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="p-3 border-top">
+        <nav>
+            <ul class="pagination pagination-sm justify-content-center mb-0">
+                <li class="page-item {% if page == 1 %}disabled{% endif %}">
+                    <a class="page-link" href="?page={{ page - 1 }}&action={{ action_filter or '' }}&user_id={{ user_filter or '' }}">&laquo;</a>
+                </li>
+                {% for p in range(1, total_pages + 1) %}
+                {% if p <= 3 or p > total_pages - 3 or (p >= page - 1 and p <= page + 1) %}
+                <li class="page-item {% if p == page %}active{% endif %}">
+                    <a class="page-link" href="?page={{ p }}&action={{ action_filter or '' }}&user_id={{ user_filter or '' }}">{{ p }}</a>
+                </li>
+                {% elif p == 4 or p == total_pages - 3 %}
+                <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+                {% endfor %}
+                <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+                    <a class="page-link" href="?page={{ page + 1 }}&action={{ action_filter or '' }}&user_id={{ user_filter or '' }}">&raquo;</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
