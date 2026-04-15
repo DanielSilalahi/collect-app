@@ -29,6 +29,8 @@ class Customer(Base):
     emergency_contact_2_phone = Column(String(50), nullable=True)
     
     created_at = Column(DateTime, default=func.now())
+    is_deleted = Column(Integer, default=0, index=True) # Using Integer (0/1) for better cross-DB compatibility, mapped to boolean logic
+
 
     # Relationships
     agent = relationship("User", back_populates="assigned_customers", foreign_keys=[assigned_agent_id])

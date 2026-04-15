@@ -18,4 +18,4 @@ class VaRequest(Base):
     # Relationships
     customer = relationship("Customer", back_populates="va_requests")
     agent = relationship("User", back_populates="va_requests", foreign_keys=[agent_id])
-    va_data = relationship("VaData", back_populates="va_request", uselist=False)
+    va_data = relationship("VaData", back_populates="va_request", uselist=False, cascade="all, delete-orphan")

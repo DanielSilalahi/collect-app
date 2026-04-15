@@ -39,4 +39,18 @@ class CollectionBriefResponse(BaseModel):
         from_attributes = True
 
 
+class CustomerStats(BaseModel):
+    total: int
+    bayar: int
+    janji_bayar: int
+    belum: int
+    tidak_ketemu: int
+
+
+class PaginatedCustomerResponse(BaseModel):
+    customers: List[CustomerResponse]
+    stats: CustomerStats
+    total_count: int
+
+
 CustomerDetailResponse.model_rebuild()

@@ -1,5 +1,7 @@
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session, joinedload
+from fastapi import APIRouter, Depends, Query, HTTPException
+from sqlalchemy.orm import Session
+from sqlalchemy import or_, case
+from typing import Optional, List
 from core.database import get_db
 from core.dependencies import get_current_user_api
 from models.user import User
@@ -7,26 +9,65 @@ from models.customer import Customer
 from models.collection import Collection
 from models.va_request import VaRequest
 from models.va_data import VaData
-from schemas.customer import CustomerResponse, CustomerDetailResponse, CollectionBriefResponse
-from typing import Optional
+from schemas.customer import CustomerResponse, CustomerDetailResponse, CollectionBriefResponse, PaginatedCustomerResponse, CustomerStats
 
 router = APIRouter(prefix="/api/customers", tags=["Customer API"])
 
-
-@router.get("", response_model=list[CustomerResponse])
+@router.get("", response_model=PaginatedCustomerResponse)
 def list_customers(
     status: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    limit: int = Query(20),
+    offset: int = Query(0),
+    pinned_ids: List[int] = Query([]),
     user: User = Depends(get_current_user_api),
     db: Session = Depends(get_db),
 ):
-    """List customers assigned to current agent."""
-    query = db.query(Customer).filter(Customer.assigned_agent_id == user.id)
+    """List customers assigned to current agent with pagination, search, and global stats."""
+    base_query = db.query(Customer).filter(Customer.assigned_agent_id == user.id, Customer.is_deleted == 0)
 
+    # Calculate global stats FOR THIS AGENT
+    stats = CustomerStats(
+        total=base_query.count(),
+        bayar=base_query.filter(Customer.status == 'bayar').count(),
+        janji_bayar=base_query.filter(Customer.status == 'janji_bayar').count(),
+        belum=base_query.filter(Customer.status == 'belum').count(),
+        tidak_ketemu=base_query.filter(Customer.status == 'tidak_ketemu').count(),
+    )
+
+    # Apply filters for the list
+    list_query = base_query
     if status:
-        query = query.filter(Customer.status == status)
+        list_query = list_query.filter(Customer.status == status)
+    
+    if search:
+        search_filter = f"%{search}%"
+        list_query = list_query.filter(
+            or_(
+                Customer.name.ilike(search_filter),
+                Customer.phone.ilike(search_filter),
+                Customer.loan_number.ilike(search_filter)
+            )
+        )
 
-    customers = query.order_by(Customer.name.asc()).all()
-    return [CustomerResponse.model_validate(c) for c in customers]
+    # Calculate total matching items for pagination
+    total_count = list_query.count()
+
+    # Sort: Pinned first, then Name
+    order_stmt = []
+    if pinned_ids:
+        # Priority for items in pinned_ids
+        order_stmt.append(case((Customer.id.in_(pinned_ids), 0), else_=1))
+    
+    order_stmt.append(Customer.name.asc())
+
+    customers = list_query.order_by(*order_stmt).offset(offset).limit(limit).all()
+    
+    return PaginatedCustomerResponse(
+        customers=[CustomerResponse.model_validate(c) for c in customers],
+        stats=stats,
+        total_count=total_count
+    )
 
 
 @router.get("/{customer_id}", response_model=CustomerDetailResponse)
@@ -38,7 +79,7 @@ def get_customer(
     """Get customer detail with VA info and collection history."""
     customer = (
         db.query(Customer)
-        .filter(Customer.id == customer_id, Customer.assigned_agent_id == user.id)
+        .filter(Customer.id == customer_id, Customer.assigned_agent_id == user.id, Customer.is_deleted == 0)
         .first()
     )
     if not customer:

@@ -63,6 +63,10 @@ async def not_found_handler(request: Request, exc):
 @app.on_event("startup")
 def on_startup():
     """Initialize database and seed admin user."""
+    import os
+    if os.getenv("DISABLE_AUTO_SEED") == "1":
+        return
+        
     init_db()
 
     # Seed default admin user if none exists

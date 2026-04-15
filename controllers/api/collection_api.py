@@ -26,6 +26,7 @@ def create_collection(
     customer = db.query(Customer).filter(
         Customer.id == payload.customer_id,
         Customer.assigned_agent_id == user.id,
+        Customer.is_deleted == 0,
     ).first()
     if not customer:
         raise HTTPException(status_code=404, detail="Customer tidak ditemukan")
@@ -186,6 +187,7 @@ def sync_collections(
             customer = db.query(Customer).filter(
                 Customer.id == item.customer_id,
                 Customer.assigned_agent_id == user.id,
+                Customer.is_deleted == 0,
             ).first()
             if not customer:
                 errors.append({"customer_id": item.customer_id, "error": "Customer tidak ditemukan"})

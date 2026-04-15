@@ -43,7 +43,7 @@ def customer_list_batches(
         func.count(Customer.id).label("total_customers"),
         func.sum(case((Customer.assigned_agent_id != None, 1), else_=0)).label("assigned_count"),
         func.max(Customer.created_at).label("upload_date")
-    ).group_by(Customer.upload_batch).order_by(func.max(Customer.created_at).desc()).all()
+    ).filter(Customer.is_deleted == 0).group_by(Customer.upload_batch).order_by(func.max(Customer.created_at).desc()).all()
 
     agents = db.query(User).filter(User.role == "agent", User.is_active == True).all()
 
@@ -83,7 +83,7 @@ def customer_batch_detail(
     from models.collection import Collection
     query = db.query(Customer).options(
         joinedload(Customer.collections).joinedload(Collection.agent)
-    )
+    ).filter(Customer.is_deleted == 0)
     
     if batch_code.lower() == "manual":
         query = query.filter(Customer.upload_batch == None)
@@ -485,16 +485,16 @@ def bulk_delete_customers(
             status_code=302,
         )
 
-    customers = db.query(Customer).filter(Customer.id.in_(ids)).all()
-    deleted_count = 0
-    for c in customers:
-        db.delete(c)
-        deleted_count += 1
+    updated = (
+        db.query(Customer)
+        .filter(Customer.id.in_(ids))
+        .update({"is_deleted": 1}, synchronize_session="fetch")
+    )
 
     log = ActivityLog(
         user_id=current_user.id,
         action="delete_bulk_customer",
-        detail=f"Menghapus secara massal {deleted_count} customers",
+        detail=f"Menghapus secara lembut (soft delete) {updated} customers",
     )
     db.add(log)
     db.commit()
@@ -520,15 +520,16 @@ def delete_batch(
     if not current_user:
         return RedirectResponse("/login", status_code=302)
 
-    customers = db.query(Customer).filter(Customer.upload_batch == batch_code).all()
-    count = len(customers)
-    for c in customers:
-        db.delete(c)
+    updated = (
+        db.query(Customer)
+        .filter(Customer.upload_batch == batch_code)
+        .update({"is_deleted": 1}, synchronize_session="fetch")
+    )
 
     log = ActivityLog(
         user_id=current_user.id,
         action="delete_batch",
-        detail=f"Hapus batch {batch_code} ({count} customers)",
+        detail=f"Hapus batch (soft delete) {batch_code} ({updated} customers)",
     )
     db.add(log)
     db.commit()
@@ -558,12 +559,12 @@ def delete_customer(
         )
 
     name = customer.name
-    db.delete(customer)
+    customer.is_deleted = 1
 
     log = ActivityLog(
         user_id=current_user.id,
         action="delete_customer",
-        detail=f"Hapus customer: {name}",
+        detail=f"Hapus customer (soft delete): {name}",
     )
     db.add(log)
     db.commit()

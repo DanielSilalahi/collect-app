@@ -22,6 +22,7 @@ def request_va(
     customer = db.query(Customer).filter(
         Customer.id == payload.customer_id,
         Customer.assigned_agent_id == user.id,
+        Customer.is_deleted == 0
     ).first()
     if not customer:
         raise HTTPException(status_code=404, detail="Customer tidak ditemukan")
