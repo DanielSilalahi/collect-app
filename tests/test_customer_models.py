@@ -4,6 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from core.database import Base
+from models import activity_log, collection, customer_address, customer_contact, customer_import_row, customer_loan, user, va_data, va_request  # noqa: F401
 from models.customer import Customer
 from models.customer_loan import CustomerLoan
 
@@ -21,6 +22,7 @@ def test_customer_can_hold_current_loan_snapshot():
             status="new",
         )
         loan = CustomerLoan(
+            customer=customer,
             is_current=1,
             loan_number="LN-001",
             total_outstanding=Decimal("1500000.00"),
@@ -33,9 +35,10 @@ def test_customer_can_hold_current_loan_snapshot():
 
         session.add(customer)
         session.commit()
+        customer_id = customer.id
         session.expunge_all()
 
-        loaded_customer = session.get(Customer, customer.id)
+        loaded_customer = session.get(Customer, customer_id)
 
         assert loaded_customer.current_loan.loan_number == "LN-001"
         assert loaded_customer.current_total_outstanding == Decimal("1500000.00")
