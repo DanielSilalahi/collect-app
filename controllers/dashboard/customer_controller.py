@@ -249,9 +249,13 @@ def customer_batch_detail(
         return RedirectResponse("/login", status_code=302)
 
     per_page = 20
-    from sqlalchemy.orm import joinedload
+    from sqlalchemy.orm import joinedload, selectinload
     from models.collection import Collection
     query = db.query(Customer).options(
+        joinedload(Customer.agent),
+        joinedload(Customer.current_loan),
+        selectinload(Customer.addresses),
+        selectinload(Customer.contacts),
         joinedload(Customer.collections).joinedload(Collection.agent)
     ).filter(Customer.is_deleted == 0)
     

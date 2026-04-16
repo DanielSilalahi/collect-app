@@ -5,7 +5,6 @@
 {% block page_title %}Customer Management{% endblock %}
 
 {% block content %}
-<!-- Header / Back Button -->
 <div class="row mb-3 align-items-center">
     <div class="col-auto">
         <a href="/customers" class="btn btn-outline-secondary btn-sm">
@@ -17,7 +16,6 @@
     </div>
 </div>
 
-<!-- Filter Bar -->
 <div class="filter-bar">
     <form method="GET" action="" class="row g-2 align-items-end">
         <div class="col-md-3">
@@ -28,10 +26,16 @@
             <label class="form-label small fw-semibold">Status</label>
             <select class="form-select form-select-sm" name="status">
                 <option value="">Semua</option>
-                <option value="belum" {% if status_filter == 'belum' %}selected{% endif %}>Belum</option>
-                <option value="janji_bayar" {% if status_filter == 'janji_bayar' %}selected{% endif %}>Janji Bayar</option>
-                <option value="bayar" {% if status_filter == 'bayar' %}selected{% endif %}>Bayar</option>
-                <option value="tidak_ketemu" {% if status_filter == 'tidak_ketemu' %}selected{% endif %}>Tidak Ketemu</option>
+                <option value="new" {% if status_filter == 'new' %}selected{% endif %}>New</option>
+                <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                <option value="contacted" {% if status_filter == 'contacted' %}selected{% endif %}>Contacted</option>
+                <option value="rpc" {% if status_filter == 'rpc' %}selected{% endif %}>RPC</option>
+                <option value="ptp" {% if status_filter == 'ptp' %}selected{% endif %}>PTP</option>
+                <option value="paid_partial" {% if status_filter == 'paid_partial' %}selected{% endif %}>Paid Partial</option>
+                <option value="paid_full" {% if status_filter == 'paid_full' %}selected{% endif %}>Paid Full</option>
+                <option value="unreachable" {% if status_filter == 'unreachable' %}selected{% endif %}>Unreachable</option>
+                <option value="skip" {% if status_filter == 'skip' %}selected{% endif %}>Skip</option>
+                <option value="closed" {% if status_filter == 'closed' %}selected{% endif %}>Closed</option>
             </select>
         </div>
         <div class="col-md-2">
@@ -59,7 +63,6 @@
     </form>
 </div>
 
-<!-- Customer Table -->
 <div class="table-card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-people me-2"></i>Daftar Customer ({{ total }})</span>
@@ -71,41 +74,59 @@
                     <th><input type="checkbox" id="selectAll" class="form-check-input"></th>
                     <th>Nama</th>
                     <th>Alamat</th>
-                    <th>Phone</th>
+                    <th>Kontak</th>
                     <th>Agent</th>
+                    <th>Loan Snapshot</th>
                     <th>Status</th>
                     <th>Aksi</th>
                 </tr>
             </thead>
             <tbody>
                 {% for c in customers %}
+                {% set emergency_contact = c.contacts[0] if c.contacts else None %}
                 <tr>
                     <td><input type="checkbox" class="form-check-input row-checkbox" value="{{ c.id }}"></td>
-                    <td><strong>{{ c.name }}</strong></td>
-                    <td class="small text-muted" style="max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ c.address or '-' }}</td>
-                    <td class="small">{{ c.phone or '-' }}</td>
+                    <td>
+                        <div class="fw-semibold">{{ c.full_name }}</div>
+                        <div class="small text-muted">{{ c.primary_city or 'Kota belum tersedia' }}</div>
+                    </td>
+                    <td class="small text-muted" style="max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ c.primary_address_summary or '-' }}</td>
+                    <td class="small">
+                        <div>{{ c.primary_phone or '-' }}</div>
+                        <div class="text-muted">{{ emergency_contact.phone_number if emergency_contact and emergency_contact.phone_number else 'Tanpa kontak darurat' }}</div>
+                    </td>
                     <td class="small">{{ c.agent.name if c.agent else '<span class="text-muted">Belum assign</span>' | safe }}</td>
+                    <td class="small">
+                        {% if c.current_loan %}
+                        <div class="fw-semibold">{{ c.current_loan.loan_number or '-' }}</div>
+                        <div class="text-muted">DPD {{ c.current_dpd if c.current_dpd != None else '-' }} • OS {{ ("Rp {:,}".format(c.current_total_outstanding|int)) if c.current_total_outstanding else '-' }}</div>
+                        {% else %}
+                        <span class="text-muted">Belum ada snapshot pinjaman</span>
+                        {% endif %}
+                    </td>
                     <td>
                         <span class="badge badge-{{ c.status }}">{{ c.status | replace('_', ' ') | title }}</span>
+                        {% if c.sub_status %}
+                        <div class="small text-muted mt-1">{{ c.sub_status | replace('_', ' ') | title }}</div>
+                        {% endif %}
                     </td>
                     <td>
                         <button class="btn btn-outline-info btn-sm me-1" data-bs-toggle="modal" data-bs-target="#detailModal{{ c.id }}" title="Detail">
                             <i class="bi bi-eye"></i>
                         </button>
-                        <button class="btn btn-outline-danger btn-sm" onclick="confirmDelete('/customers/{{ c.id }}/delete', '{{ c.name }}')" title="Hapus">
+                        <button class="btn btn-outline-danger btn-sm" onclick="confirmDelete('/customers/{{ c.id }}/delete', '{{ c.full_name }}')" title="Hapus">
                             <i class="bi bi-trash"></i>
                         </button>
                     </td>
                 </tr>
                 {% endfor %}
                 {% if not customers %}
-                <tr><td colspan="7" class="text-center text-muted py-4">Tidak ada data customer</td></tr>
+                <tr><td colspan="8" class="text-center text-muted py-4">Tidak ada data customer</td></tr>
                 {% endif %}
             </tbody>
         </table>
     </div>
 
-    <!-- Pagination -->
     {% if total_pages > 1 %}
     <div class="p-3 border-top">
         <nav>
@@ -131,8 +152,9 @@
     {% endif %}
 </div>
 
-<!-- Customer Detail Modals -->
 {% for c in customers %}
+{% set primary_address = c.addresses[0] if c.addresses else None %}
+{% set emergency_contacts = c.contacts | selectattr('contact_role', 'equalto', 'emergency') | list %}
 <div class="modal fade" id="detailModal{{ c.id }}" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
@@ -144,49 +166,59 @@
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label class="small text-muted fw-bold">Nama</label>
-                        <div>{{ c.name }}</div>
+                        <div>{{ c.full_name }}</div>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="small text-muted fw-bold">No. Telepon</label>
-                        <div>{{ c.phone or '-' }}</div>
+                        <div>{{ c.primary_phone or '-' }}</div>
                     </div>
                     <div class="col-md-12 mb-3">
                         <label class="small text-muted fw-bold">Alamat</label>
-                        <div>{{ c.address or '-' }}</div>
+                        <div>{{ c.primary_address_summary or '-' }}</div>
                     </div>
-                    
+
                     <div class="col-12"><hr class="my-2"></div>
-                    
+
                     <div class="col-md-6 mb-3">
                         <label class="small text-muted fw-bold">Platform / Aplikasi</label>
                         <div>{{ c.platform_name or '-' }}</div>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="small text-muted fw-bold">Nomor Pinjaman (Loan Number)</label>
-                        <div>{{ c.loan_number or '-' }}</div>
+                        <div>{{ c.current_loan.loan_number if c.current_loan else '-' }}</div>
                     </div>
                     <div class="col-md-4 mb-3">
                         <label class="small text-muted fw-bold">Tagihan (Outstanding)</label>
-                        <div>{{ ("Rp {:,}".format(c.outstanding_amount)) if c.outstanding_amount else '-' }}</div>
+                        <div>{{ ("Rp {:,}".format(c.current_total_outstanding|int)) if c.current_total_outstanding else '-' }}</div>
                     </div>
                     <div class="col-md-4 mb-3">
                         <label class="small text-muted fw-bold">Overdue (Hari)</label>
-                        <div>{{ c.overdue_days if c.overdue_days != None else '-' }}</div>
+                        <div>{{ c.current_dpd if c.current_dpd != None else '-' }}</div>
                     </div>
                     <div class="col-md-4 mb-3">
                         <label class="small text-muted fw-bold">Tanggal Jatuh Tempo</label>
-                        <div>{{ c.due_date.strftime('%d/%m/%Y') if c.due_date else '-' }}</div>
+                        <div>{{ c.current_loan.due_date.strftime('%d/%m/%Y') if c.current_loan and c.current_loan.due_date else '-' }}</div>
                     </div>
 
                     <div class="col-12"><hr class="my-2"></div>
 
                     <div class="col-md-6 mb-3">
-                        <label class="small text-muted fw-bold">Kontak Darurat 1</label>
-                        <div>{{ c.emergency_contact_1_name or '-' }} <br><span class="text-muted">{{ c.emergency_contact_1_phone or '-' }}</span></div>
+                        <label class="small text-muted fw-bold">Status Snapshot</label>
+                        <div>{{ c.status | replace('_', ' ') | title }}</div>
+                        <div class="text-muted">{{ c.sub_status | replace('_', ' ') | title if c.sub_status else 'Tanpa sub status' }}</div>
                     </div>
                     <div class="col-md-6 mb-3">
-                        <label class="small text-muted fw-bold">Kontak Darurat 2</label>
-                        <div>{{ c.emergency_contact_2_name or '-' }} <br><span class="text-muted">{{ c.emergency_contact_2_phone or '-' }}</span></div>
+                        <label class="small text-muted fw-bold">Kontak Darurat</label>
+                        {% if emergency_contacts %}
+                            {% for contact in emergency_contacts %}
+                            <div class="{% if not loop.first %}mt-2{% endif %}">
+                                {{ contact.name or '-' }}<br>
+                                <span class="text-muted">{{ contact.phone_number or '-' }}</span>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                        <div>-</div>
+                        {% endif %}
                     </div>
 
                     <div class="col-12"><hr class="my-2"></div>
@@ -194,10 +226,12 @@
                     <div class="col-md-6 mb-3">
                         <label class="small text-muted fw-bold">Koordinat GPS</label>
                         <div>
-                            {% if c.lat and c.lng %}
-                            <a href="https://www.google.com/maps/search/?api=1&query={{ c.lat }},{{ c.lng }}" target="_blank" class="text-decoration-none">
-                                <i class="bi bi-geo-alt-fill text-danger me-1"></i>{{ c.lat }}, {{ c.lng }}
+                            {% if primary_address and primary_address.lat and primary_address.lng %}
+                            <a href="https://www.google.com/maps/search/?api=1&query={{ primary_address.lat }},{{ primary_address.lng }}" target="_blank" class="text-decoration-none">
+                                <i class="bi bi-geo-alt-fill text-danger me-1"></i>{{ primary_address.lat }}, {{ primary_address.lng }}
                             </a>
+                            {% elif primary_address and primary_address.raw_lat_lng %}
+                            <span>{{ primary_address.raw_lat_lng }}</span>
                             {% else %}
                             -
                             {% endif %}
@@ -208,7 +242,6 @@
                         <div>{{ c.notes or '-' }}</div>
                     </div>
 
-                    <!-- Visit Logs Section -->
                     <div class="col-12 mt-3 mb-2">
                         <h6 class="fw-bold text-primary mb-3"><i class="bi bi-journal-check me-2"></i>Histori Kunjungan Lapangan</h6>
                         {% if c.collections %}
@@ -216,33 +249,33 @@
                                 <div class="list-group list-group-flush">
                                     {% for col in c.collections|sort(attribute='timestamp', reverse=True) %}
                                     <div class="list-group-item bg-transparent px-3 py-3 {% if not loop.last %}border-bottom{% endif %}">
-                                    <div class="d-flex w-100 justify-content-between mb-1">
-                                        <h6 class="mb-0 fw-bold"><i class="bi bi-person-badge text-muted me-1"></i>{{ col.agent.name if col.agent else 'Unknown Agent' }}</h6>
-                                        <small class="text-muted"><i class="bi bi-clock_history me-1"></i>{{ col.timestamp.strftime('%d %b %Y, %H:%M') if col.timestamp else col.created_at.strftime('%d %b %Y') }}</small>
-                                    </div>
-                                    <div class="mb-2 mt-2">
-                                        <span class="badge badge-{{ col.status }} bg-opacity-75">{{ col.status | replace('_', ' ') | title }}</span>
-                                    </div>
-                                    <p class="mb-2 small"><strong>Laporan/Keterangan:</strong><br>{{ col.notes or '-' }}</p>
-                                    {% if col.photo_url %}
-                                    <div class="mt-2 mb-2">
-                                        <a href="{{ col.photo_url }}" target="_blank">
-                                            <img src="{{ col.photo_url }}" alt="Bukti Kunjungan" class="img-thumbnail shadow-sm rounded" style="max-height: 125px; object-fit: cover;">
-                                        </a>
-                                        <div class="small text-muted mt-1" style="font-size: 0.70rem;">Klik foto untuk memperbesar</div>
-                                    </div>
-                                    {% endif %}
-                                    <div class="mt-2">
-                                        {% if col.gps_lat and col.gps_lng %}
-                                        <a href="https://www.google.com/maps/search/?api=1&query={{ col.gps_lat }},{{ col.gps_lng }}" target="_blank" class="small text-decoration-none">
-                                            <i class="bi bi-geo-alt-fill text-danger me-1"></i>Buka Peta Lokasi Kunjungan
-                                        </a>
-                                        {% else %}
-                                        <span class="small text-muted"><i class="bi bi-geo me-1"></i>Lokasi GPS tidak tercatat</span>
+                                        <div class="d-flex w-100 justify-content-between mb-1">
+                                            <h6 class="mb-0 fw-bold"><i class="bi bi-person-badge text-muted me-1"></i>{{ col.agent.name if col.agent else 'Unknown Agent' }}</h6>
+                                            <small class="text-muted"><i class="bi bi-clock_history me-1"></i>{{ col.timestamp.strftime('%d %b %Y, %H:%M') if col.timestamp else col.created_at.strftime('%d %b %Y') }}</small>
+                                        </div>
+                                        <div class="mb-2 mt-2">
+                                            <span class="badge badge-{{ col.status }} bg-opacity-75">{{ col.status | replace('_', ' ') | title }}</span>
+                                        </div>
+                                        <p class="mb-2 small"><strong>Laporan/Keterangan:</strong><br>{{ col.notes or '-' }}</p>
+                                        {% if col.photo_url %}
+                                        <div class="mt-2 mb-2">
+                                            <a href="{{ col.photo_url }}" target="_blank">
+                                                <img src="{{ col.photo_url }}" alt="Bukti Kunjungan" class="img-thumbnail shadow-sm rounded" style="max-height: 125px; object-fit: cover;">
+                                            </a>
+                                            <div class="small text-muted mt-1" style="font-size: 0.70rem;">Klik foto untuk memperbesar</div>
+                                        </div>
                                         {% endif %}
+                                        <div class="mt-2">
+                                            {% if col.gps_lat and col.gps_lng %}
+                                            <a href="https://www.google.com/maps/search/?api=1&query={{ col.gps_lat }},{{ col.gps_lng }}" target="_blank" class="small text-decoration-none">
+                                                <i class="bi bi-geo-alt-fill text-danger me-1"></i>Buka Peta Lokasi Kunjungan
+                                            </a>
+                                            {% else %}
+                                            <span class="small text-muted"><i class="bi bi-geo me-1"></i>Lokasi GPS tidak tercatat</span>
+                                            {% endif %}
+                                        </div>
                                     </div>
-                                </div>
-                                {% endfor %}
+                                    {% endfor %}
                                 </div>
                             </div>
                         {% else %}
@@ -261,7 +294,6 @@
 </div>
 {% endfor %}
 
-<!-- Assign Modal -->
 <div class="modal fade" id="assignModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">

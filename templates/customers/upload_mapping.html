@@ -4,63 +4,157 @@
 {% block title %}Mapping Excel Data{% endblock %}
 {% block page_title %}Upload Data Customer{% endblock %}
 
+{% block extra_css %}
+<style>
+    .mapping-shell {
+        display: grid;
+        gap: 1.25rem;
+    }
+
+    .mapping-hero {
+        background: linear-gradient(135deg, #082b66 0%, #1259c3 52%, #79b8ff 100%);
+        border-radius: 1.5rem;
+        color: #fff;
+        overflow: hidden;
+    }
+
+    .mapping-hero .muted {
+        color: rgba(255, 255, 255, 0.78);
+    }
+
+    .mapping-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .mapping-tags span {
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        padding: 0.45rem 0.8rem;
+        font-size: 0.8rem;
+        line-height: 1;
+    }
+
+    .mapping-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.9fr);
+        gap: 1.25rem;
+    }
+
+    .mapping-panel {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 1.25rem;
+        background: #fff;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+    }
+
+    .mapping-table tbody tr:hover {
+        background: rgba(13, 110, 253, 0.03);
+    }
+
+    @media (max-width: 991.98px) {
+        .mapping-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-primary text-white">
-                <h5 class="card-title mb-0"><i class="bi bi-funnel me-2"></i>Cocokkan Kolom Excel</h5>
+<div class="mapping-shell">
+    <div class="mapping-hero p-4 p-lg-5">
+        <div class="row align-items-center g-4">
+            <div class="col-lg-7">
+                <div class="small text-uppercase fw-semibold muted mb-2">Langkah 2 dari 2</div>
+                <h2 class="fw-bold mb-3">Cocokkan header Excel ke field customer semi-normalized sebelum import dimulai.</h2>
+                <p class="muted mb-0">Setiap pilihan di bawah menentukan apakah nilai masuk ke snapshot customer, data pinjaman aktif, alamat utama, kontak darurat, atau raw import row untuk audit.</p>
             </div>
-            <div class="card-body">
-                <div class="alert alert-info small">
-                    <i class="bi bi-info-circle me-1"></i>
-                    Sistem mendeteksi <strong>{{ headers|length }} kolom</strong> dari file Excel Anda. Silahkan pilih kolom Excel yang sesuai dengan format database.
+            <div class="col-lg-5">
+                <div class="mapping-tags">
+                    {% for header in headers %}
+                    <span>{{ header }}</span>
+                    {% endfor %}
                 </div>
-
-                <form method="POST" action="/customers/upload/process">
-                    <input type="hidden" name="temp_filename" value="{{ temp_filename }}">
-                    <input type="hidden" name="agent_id" value="{{ agent_id }}">
-
-                    <div class="table-responsive">
-                        <table class="table table-bordered table-sm align-middle">
-                            <thead class="table-light">
-                                <tr>
-                                    <th width="50%">Data Sistem</th>
-                                    <th width="50%">Pilih Kolom Excel</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for field in expected_fields %}
-                                <tr>
-                                    <td>
-                                        <span class="fw-semibold text-dark">{{ field.label }}</span>
-                                        {% if field.required %}
-                                        <span class="text-danger ms-1" title="Wajib diisi">*</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <select class="form-select form-select-sm" name="mapped_{{ field.key }}" {% if field.required %}required{% endif %}>
-                                            <option value="">-- Abaikan (Tidak diimport) --</option>
-                                            {% for header in headers %}
-                                            <option value="{{ loop.index0 }}">{{ header }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="d-flex justify-content-between mt-4 border-top pt-3">
-                        <a href="/customers" class="btn btn-outline-secondary px-4">Batal</a>
-                        <button type="submit" class="btn btn-success px-4">
-                            <i class="bi bi-check2-circle me-1"></i>Mulai Import
-                        </button>
-                    </div>
-                </form>
             </div>
         </div>
     </div>
+
+    <form method="POST" action="/customers/upload/process" class="mapping-grid">
+        <input type="hidden" name="temp_filename" value="{{ temp_filename }}">
+        <input type="hidden" name="agent_id" value="{{ agent_id }}">
+
+        <div class="mapping-panel p-3 p-lg-4">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                <div>
+                    <h5 class="mb-1 fw-bold"><i class="bi bi-diagram-3 me-2 text-primary"></i>Field Mapping</h5>
+                    <div class="small text-muted">Sistem mendeteksi <strong>{{ headers|length }} kolom</strong>. Pilih header Excel yang paling sesuai untuk setiap field tujuan.</div>
+                </div>
+                <div class="small text-muted"><span class="text-danger fw-semibold">*</span> wajib dipilih</div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mapping-table">
+                    <thead class="table-light">
+                        <tr>
+                            <th width="46%">Field tujuan</th>
+                            <th width="54%">Header Excel</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for field in expected_fields %}
+                        <tr>
+                            <td>
+                                <div class="fw-semibold text-dark">{{ field.label }}</div>
+                                <div class="small text-muted">{{ field.key }}</div>
+                            </td>
+                            <td>
+                                <select class="form-select form-select-sm" name="mapped_{{ field.key }}" {% if field.required %}required{% endif %}>
+                                    <option value="">-- Abaikan field ini --</option>
+                                    {% for header in headers %}
+                                    <option value="{{ loop.index0 }}">{{ header }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-flex justify-content-between mt-4 border-top pt-3">
+                <a href="/customers" class="btn btn-outline-secondary px-4">Batal</a>
+                <button type="submit" class="btn btn-success px-4">
+                    <i class="bi bi-check2-circle me-1"></i>Mulai Import
+                </button>
+            </div>
+        </div>
+
+        <div class="mapping-panel p-3 p-lg-4">
+            <div class="small text-uppercase fw-semibold text-primary mb-2">Panduan Cepat</div>
+            <h5 class="fw-bold mb-3">Cara memilih mapping yang aman</h5>
+            <div class="small text-muted mb-3">Pilih hanya kolom yang benar-benar tersedia di file partner. Field yang tidak dipilih akan dilewati, bukan menyebabkan import gagal.</div>
+
+            <div class="border rounded-4 p-3 mb-3 bg-light-subtle">
+                <div class="fw-semibold mb-2">Prioritas minimal</div>
+                <ul class="small text-muted mb-0 ps-3">
+                    <li>`full_name` wajib untuk membuat customer</li>
+                    <li>`primary_phone` membantu dashboard dan follow-up</li>
+                    <li>`loan_number`, `total_outstanding`, dan `overdue_days` mengisi snapshot pinjaman</li>
+                </ul>
+            </div>
+
+            <div class="border rounded-4 p-3 mb-3">
+                <div class="fw-semibold mb-2">Koordinat lokasi</div>
+                <div class="small text-muted">Kalau partner hanya mengirim satu kolom gabungan seperti `Lat&Lng`, pilih ke `raw_lat_lng`. Nilai aslinya tetap disimpan walau belum dipecah ke `lat` dan `lng`.</div>
+            </div>
+
+            <div class="border rounded-4 p-3">
+                <div class="fw-semibold mb-2">Kontak darurat</div>
+                <div class="small text-muted">Gunakan `emergency_contact_name` dan `emergency_contact_phone` bila file partner punya nomor penanggung jawab lain selain nomor utama nasabah.</div>
+            </div>
+        </div>
+    </form>
 </div>
 {% endblock %}

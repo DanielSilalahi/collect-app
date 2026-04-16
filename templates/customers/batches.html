@@ -5,6 +5,52 @@
 {% block page_title %}Customer Management{% endblock %}
 
 {% block content %}
+<div class="row g-3 mb-4">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm overflow-hidden">
+            <div class="card-body p-4" style="background: linear-gradient(135deg, #0f3d91 0%, #1e6fd9 58%, #61b3ff 100%);">
+                <div class="row align-items-center g-4">
+                    <div class="col-md-8 text-white">
+                        <div class="small text-uppercase fw-semibold opacity-75 mb-2">Semi-Normalized Upload</div>
+                        <h3 class="fw-bold mb-2">Upload file Excel, cocokkan kolom, lalu simpan ke snapshot customer baru.</h3>
+                        <p class="mb-0 opacity-75">Alur upload sekarang memisahkan snapshot customer, data pinjaman, alamat, kontak darurat, dan raw import row agar lebih aman untuk audit dan reparsing.</p>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="rounded-4 bg-white bg-opacity-10 border border-white border-opacity-25 p-3 text-white">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <span class="badge bg-light text-primary">1</span>
+                                <span class="small fw-semibold">Pilih file `.xlsx`</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <span class="badge bg-light text-primary">2</span>
+                                <span class="small fw-semibold">Mapping header partner</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-light text-primary">3</span>
+                                <span class="small fw-semibold">Import ke model semi-normalized</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-4">
+                <div class="small text-uppercase fw-semibold text-primary mb-2">Format Didukung</div>
+                <h5 class="fw-bold mb-3">Header bisa fleksibel, mapping-nya dipilih di langkah berikut.</h5>
+                <ul class="list-unstyled small text-muted mb-0">
+                    <li class="mb-2"><i class="bi bi-check2-circle text-success me-2"></i>Nama nasabah dan nomor HP utama</li>
+                    <li class="mb-2"><i class="bi bi-check2-circle text-success me-2"></i>Alamat, kota, dan koordinat gabungan</li>
+                    <li class="mb-2"><i class="bi bi-check2-circle text-success me-2"></i>Loan number, OS, DPD, dan due date</li>
+                    <li><i class="bi bi-check2-circle text-success me-2"></i>Kontak darurat untuk follow-up lapangan</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="row align-items-center mb-3">
     <div class="col-md-6">
         <h5 class="mb-0 text-muted">Daftar Batch Upload</h5>
@@ -68,7 +114,6 @@
     </div>
 </div>
 
-<!-- Upload Modal -->
 <div class="modal fade" id="uploadModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content border-0 shadow">
@@ -78,13 +123,19 @@
             </div>
             <form method="POST" action="/customers/upload" enctype="multipart/form-data">
                 <div class="modal-body">
-                    <div class="alert alert-info small py-2">
-                        <i class="bi bi-info-circle me-1"></i>
-                        Pilih file Excel. Anda akan diminta untuk mencocokkan kolom pada langkah selanjutnya. Baris pertama harus berisi header.
+                    <div class="rounded-4 border border-primary-subtle bg-primary-subtle bg-opacity-25 p-3 mb-3">
+                        <div class="d-flex align-items-start gap-3">
+                            <div class="fs-3 text-primary"><i class="bi bi-file-earmark-spreadsheet"></i></div>
+                            <div>
+                                <div class="fw-semibold text-dark mb-1">Upload sekarang lanjut ke layar mapping header</div>
+                                <div class="small text-muted">Baris pertama harus berisi nama kolom. Setelah file dipilih, sistem akan meminta Anda mencocokkan header partner ke field customer baru.</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label small fw-semibold">File Excel (.xlsx)</label>
                         <input type="file" class="form-control" name="file" accept=".xlsx" required>
+                        <div class="form-text">Gunakan format `.xlsx`. File CSV atau gambar tidak akan diproses.</div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label small fw-semibold">Assign ke Agent (opsional)</label>
@@ -98,7 +149,7 @@
                 </div>
                 <div class="modal-footer bg-light">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-success"><i class="bi bi-upload me-1"></i>Upload & Lanjut</button>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-upload me-1"></i>Upload & Lanjut ke Mapping</button>
                 </div>
             </form>
         </div>
