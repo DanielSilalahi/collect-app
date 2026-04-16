@@ -1,4 +1,7 @@
-from controllers.dashboard.customer_controller import build_customer_import_payload
+from controllers.dashboard.customer_controller import (
+    build_customer_import_payload,
+    filter_field_definitions_by_runtime_columns,
+)
 
 
 def test_import_row_preserves_raw_lat_lng_and_snapshot_fields():
@@ -33,3 +36,22 @@ def test_import_row_preserves_raw_lat_lng_and_snapshot_fields():
     assert result.loan.overdue_days == 18
     assert result.address.raw_lat_lng == "-6.2,106.8"
     assert result.import_row.raw_payload["Lat&Lng"] == "-6.2,106.8"
+
+
+def test_runtime_schema_filter_hides_fields_missing_from_customer_table():
+    runtime_columns_by_target = {
+        "customer": {"full_name", "primary_phone", "upload_batch", "status", "search_name", "search_nik"},
+        "address": {"full_address", "address_type", "is_primary", "is_active", "raw_lat_lng"},
+        "loan": {"is_current", "loan_number", "total_outstanding", "overdue_days", "platform_name"},
+        "contact": {"contact_type", "contact_role", "name", "phone_number"},
+        "import_row": {"upload_batch", "import_status", "import_error_flag", "raw_customer_name", "raw_phone", "raw_address", "raw_lat_lng", "raw_payload"},
+    }
+
+    visible_keys = {
+        field["key"]
+        for field in filter_field_definitions_by_runtime_columns(runtime_columns_by_target)
+    }
+
+    assert "full_name" in visible_keys
+    assert "partner_name" not in visible_keys
+    assert "birth_date" not in visible_keys

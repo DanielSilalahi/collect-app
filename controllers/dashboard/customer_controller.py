@@ -10,7 +10,7 @@ import pytz
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, inspect as sqlalchemy_inspect
 from core.database import get_db
 from core.templates import templates
 from models.user import User
@@ -301,6 +301,21 @@ LEGACY_FIELD_ALIASES = {
     "emergency_contact_name": "contact_name",
     "emergency_contact_phone": "contact_phone_number",
 }
+TARGET_MODEL_BY_KEY = {
+    "customer": Customer,
+    "address": CustomerAddress,
+    "loan": CustomerLoan,
+    "contact": CustomerContact,
+    "import_row": CustomerImportRow,
+}
+TARGET_ATTR_COLUMN_BY_KEY = {
+    target: {
+        attr.key: attr.columns[0].name
+        for attr in model.__mapper__.column_attrs
+        if attr.columns
+    }
+    for target, model in TARGET_MODEL_BY_KEY.items()
+}
 
 
 def get_val(row, mapping, field_name):
@@ -320,7 +335,25 @@ def parse_mapped_value(row, mapping, field_name):
     return parser(get_val(row, mapping, field_name))
 
 
-def build_category_groups():
+def get_runtime_columns_by_target(db: Session):
+    inspector = sqlalchemy_inspect(db.get_bind())
+    return {
+        target: {column["name"] for column in inspector.get_columns(model.__table__.name)}
+        for target, model in TARGET_MODEL_BY_KEY.items()
+    }
+
+
+def filter_field_definitions_by_runtime_columns(runtime_columns_by_target):
+    visible_fields = []
+    for field in UPLOAD_FIELD_DEFINITIONS:
+        column_name = TARGET_ATTR_COLUMN_BY_KEY[field["target"]].get(field["attr"])
+        if column_name and column_name in runtime_columns_by_target.get(field["target"], set()):
+            visible_fields.append(field)
+    return visible_fields
+
+
+def build_category_groups(field_definitions=None):
+    field_definitions = field_definitions or UPLOAD_FIELD_DEFINITIONS
     groups = []
     for category_key, meta in CATEGORY_META.items():
         groups.append(
@@ -330,7 +363,7 @@ def build_category_groups():
                 "icon": meta["icon"],
                 "description": meta["description"],
                 "fields": [
-                    field for field in UPLOAD_FIELD_DEFINITIONS if field["category"] == category_key
+                    field for field in field_definitions if field["category"] == category_key
                 ],
             }
         )
@@ -347,19 +380,35 @@ def resolve_mapping_value(row, mapping, field_name, *aliases):
     return None
 
 
-def build_customer_import_payload(row, mapping, batch_code):
+def build_customer_import_payload(row, mapping, batch_code, field_definitions=None, runtime_columns_by_target=None):
+    field_definitions = field_definitions or UPLOAD_FIELD_DEFINITIONS
     normalized_mapping = {LEGACY_FIELD_ALIASES.get(key, key): value for key, value in mapping.items()}
     values_by_target = {key: {} for key in ("customer", "address", "loan", "contact", "import_row")}
     raw_values_by_key = {}
 
-    for field in UPLOAD_FIELD_DEFINITIONS:
+    def supports_attr(target, attr):
+        if runtime_columns_by_target is None:
+            return True
+        column_name = TARGET_ATTR_COLUMN_BY_KEY[target].get(attr)
+        return column_name in runtime_columns_by_target.get(target, set())
+
+    def set_value(target, attr, value):
+        if not supports_attr(target, attr):
+            return
+        values_by_target[target][attr] = value
+
+    for field in field_definitions:
         if field["key"] not in normalized_mapping:
             continue
         raw_values_by_key[field["key"]] = get_val(row, normalized_mapping, field["key"])
-        values_by_target[field["target"]][field["attr"]] = parse_mapped_value(
-            row,
-            normalized_mapping,
-            field["key"],
+        set_value(
+            field["target"],
+            field["attr"],
+            parse_mapped_value(
+                row,
+                normalized_mapping,
+                field["key"],
+            ),
         )
 
     full_name = values_by_target["customer"].get("full_name")
@@ -370,37 +419,40 @@ def build_customer_import_payload(row, mapping, batch_code):
     loan_platform_name = values_by_target["loan"].get("platform_name")
 
     if not values_by_target["customer"].get("primary_address_summary"):
-        values_by_target["customer"]["primary_address_summary"] = full_address
+        set_value("customer", "primary_address_summary", full_address)
     if not values_by_target["customer"].get("primary_city"):
-        values_by_target["customer"]["primary_city"] = address_city
-    values_by_target["customer"]["status"] = values_by_target["customer"].get("status") or "new"
-    values_by_target["customer"]["upload_batch"] = batch_code
-    values_by_target["customer"]["search_name"] = normalize_text(full_name)
-    values_by_target["customer"]["search_nik"] = normalize_text(nik)
+        set_value("customer", "primary_city", address_city)
+    if not values_by_target["customer"].get("status"):
+        set_value("customer", "status", "new")
+    set_value("customer", "upload_batch", batch_code)
+    set_value("customer", "search_name", normalize_text(full_name))
+    set_value("customer", "search_nik", normalize_text(nik))
     if values_by_target["customer"].get("current_dpd") is None:
-        values_by_target["customer"]["current_dpd"] = values_by_target["loan"].get("overdue_days")
+        set_value("customer", "current_dpd", values_by_target["loan"].get("overdue_days"))
     if values_by_target["customer"].get("current_total_outstanding") is None:
-        values_by_target["customer"]["current_total_outstanding"] = values_by_target["loan"].get("total_outstanding")
+        set_value("customer", "current_total_outstanding", values_by_target["loan"].get("total_outstanding"))
     if values_by_target["customer"].get("last_payment_date") is None:
-        values_by_target["customer"]["last_payment_date"] = values_by_target["loan"].get("last_payment_date")
+        set_value("customer", "last_payment_date", values_by_target["loan"].get("last_payment_date"))
     if values_by_target["customer"].get("last_payment_amount") is None:
-        values_by_target["customer"]["last_payment_amount"] = values_by_target["loan"].get("last_payment_amount")
+        set_value("customer", "last_payment_amount", values_by_target["loan"].get("last_payment_amount"))
 
     if values_by_target["loan"].get("is_current") is None:
-        values_by_target["loan"]["is_current"] = 1
+        set_value("loan", "is_current", 1)
     if not values_by_target["loan"].get("platform_name"):
-        values_by_target["loan"]["platform_name"] = customer_platform_name
+        set_value("loan", "platform_name", customer_platform_name)
 
-    values_by_target["address"]["address_type"] = values_by_target["address"].get("address_type") or "home"
-    values_by_target["address"]["full_address"] = (
-        full_address
-        or values_by_target["customer"].get("primary_address_summary")
-        or "-"
-    )
+    if not values_by_target["address"].get("address_type"):
+        set_value("address", "address_type", "home")
+    if not values_by_target["address"].get("full_address"):
+        set_value(
+            "address",
+            "full_address",
+            full_address or values_by_target["customer"].get("primary_address_summary") or "-",
+        )
     if values_by_target["address"].get("is_primary") is None:
-        values_by_target["address"]["is_primary"] = 1
+        set_value("address", "is_primary", 1)
     if values_by_target["address"].get("is_active") is None:
-        values_by_target["address"]["is_active"] = 1
+        set_value("address", "is_active", 1)
 
     contact_name = resolve_mapping_value(row, normalized_mapping, "contact_name", "emergency_contact_name")
     contact_phone = resolve_mapping_value(
@@ -410,59 +462,86 @@ def build_customer_import_payload(row, mapping, batch_code):
         "emergency_contact_phone",
     )
     if contact_name is not None:
-        values_by_target["contact"]["name"] = contact_name
+        set_value("contact", "name", contact_name)
     if contact_phone is not None:
-        values_by_target["contact"]["phone_number"] = contact_phone
-    values_by_target["contact"]["contact_type"] = values_by_target["contact"].get("contact_type") or "phone"
-    values_by_target["contact"]["contact_role"] = values_by_target["contact"].get("contact_role") or "emergency"
+        set_value("contact", "phone_number", contact_phone)
+    if not values_by_target["contact"].get("contact_type"):
+        set_value("contact", "contact_type", "phone")
+    if not values_by_target["contact"].get("contact_role"):
+        set_value("contact", "contact_role", "emergency")
     if values_by_target["contact"].get("is_primary") is None:
-        values_by_target["contact"]["is_primary"] = 0
+        set_value("contact", "is_primary", 0)
     if values_by_target["contact"].get("is_active") is None:
-        values_by_target["contact"]["is_active"] = 1
+        set_value("contact", "is_active", 1)
     if values_by_target["contact"].get("is_valid") is None:
-        values_by_target["contact"]["is_valid"] = 1
+        set_value("contact", "is_valid", 1)
     if values_by_target["contact"].get("is_whatsapp") is None:
-        values_by_target["contact"]["is_whatsapp"] = 0
+        set_value("contact", "is_whatsapp", 0)
     if values_by_target["contact"].get("is_verified") is None:
-        values_by_target["contact"]["is_verified"] = 0
+        set_value("contact", "is_verified", 0)
 
-    values_by_target["import_row"]["upload_batch"] = batch_code
-    values_by_target["import_row"]["import_status"] = values_by_target["import_row"].get("import_status") or "imported"
+    set_value("import_row", "upload_batch", batch_code)
+    if not values_by_target["import_row"].get("import_status"):
+        set_value("import_row", "import_status", "imported")
     if values_by_target["import_row"].get("import_error_flag") is None:
-        values_by_target["import_row"]["import_error_flag"] = 0
-    values_by_target["import_row"]["raw_payload"] = dict(row)
+        set_value("import_row", "import_error_flag", 0)
+    set_value("import_row", "raw_payload", dict(row))
     if not values_by_target["import_row"].get("raw_customer_name"):
-        values_by_target["import_row"]["raw_customer_name"] = stringify_value(raw_values_by_key.get("full_name")) or full_name
+        set_value("import_row", "raw_customer_name", stringify_value(raw_values_by_key.get("full_name")) or full_name)
     if not values_by_target["import_row"].get("raw_nik"):
-        values_by_target["import_row"]["raw_nik"] = stringify_value(raw_values_by_key.get("nik")) or nik
+        set_value("import_row", "raw_nik", stringify_value(raw_values_by_key.get("nik")) or nik)
     if not values_by_target["import_row"].get("raw_phone"):
-        values_by_target["import_row"]["raw_phone"] = stringify_value(raw_values_by_key.get("primary_phone")) or values_by_target["customer"].get("primary_phone")
+        set_value(
+            "import_row",
+            "raw_phone",
+            stringify_value(raw_values_by_key.get("primary_phone")) or values_by_target["customer"].get("primary_phone"),
+        )
     if not values_by_target["import_row"].get("raw_address"):
-        values_by_target["import_row"]["raw_address"] = stringify_value(raw_values_by_key.get("full_address")) or full_address
+        set_value("import_row", "raw_address", stringify_value(raw_values_by_key.get("full_address")) or full_address)
     if not values_by_target["import_row"].get("raw_city"):
-        values_by_target["import_row"]["raw_city"] = stringify_value(raw_values_by_key.get("city")) or address_city or values_by_target["customer"].get("primary_city")
+        set_value(
+            "import_row",
+            "raw_city",
+            stringify_value(raw_values_by_key.get("city")) or address_city or values_by_target["customer"].get("primary_city"),
+        )
     if not values_by_target["import_row"].get("raw_due_date"):
-        values_by_target["import_row"]["raw_due_date"] = stringify_value(raw_values_by_key.get("due_date"))
+        set_value("import_row", "raw_due_date", stringify_value(raw_values_by_key.get("due_date")))
     if not values_by_target["import_row"].get("raw_disbursement_date"):
-        values_by_target["import_row"]["raw_disbursement_date"] = stringify_value(raw_values_by_key.get("disbursement_date"))
+        set_value("import_row", "raw_disbursement_date", stringify_value(raw_values_by_key.get("disbursement_date")))
     if not values_by_target["import_row"].get("raw_loan_amount"):
-        values_by_target["import_row"]["raw_loan_amount"] = stringify_value(raw_values_by_key.get("loan_amount"))
+        set_value("import_row", "raw_loan_amount", stringify_value(raw_values_by_key.get("loan_amount")))
     if not values_by_target["import_row"].get("raw_installment_amount"):
-        values_by_target["import_row"]["raw_installment_amount"] = stringify_value(raw_values_by_key.get("installment_amount"))
+        set_value("import_row", "raw_installment_amount", stringify_value(raw_values_by_key.get("installment_amount")))
     if not values_by_target["import_row"].get("raw_outstanding_amount"):
-        values_by_target["import_row"]["raw_outstanding_amount"] = stringify_value(raw_values_by_key.get("total_outstanding"))
+        set_value("import_row", "raw_outstanding_amount", stringify_value(raw_values_by_key.get("total_outstanding")))
     if not values_by_target["import_row"].get("raw_overdue_days"):
-        values_by_target["import_row"]["raw_overdue_days"] = stringify_value(raw_values_by_key.get("overdue_days"))
+        set_value("import_row", "raw_overdue_days", stringify_value(raw_values_by_key.get("overdue_days")))
     if not values_by_target["import_row"].get("raw_lat"):
-        values_by_target["import_row"]["raw_lat"] = stringify_value(raw_values_by_key.get("lat")) or stringify_value(values_by_target["address"].get("lat"))
+        set_value(
+            "import_row",
+            "raw_lat",
+            stringify_value(raw_values_by_key.get("lat")) or stringify_value(values_by_target["address"].get("lat")),
+        )
     if not values_by_target["import_row"].get("raw_lng"):
-        values_by_target["import_row"]["raw_lng"] = stringify_value(raw_values_by_key.get("lng")) or stringify_value(values_by_target["address"].get("lng"))
+        set_value(
+            "import_row",
+            "raw_lng",
+            stringify_value(raw_values_by_key.get("lng")) or stringify_value(values_by_target["address"].get("lng")),
+        )
     if not values_by_target["import_row"].get("raw_lat_lng"):
-        values_by_target["import_row"]["raw_lat_lng"] = stringify_value(raw_values_by_key.get("raw_lat_lng")) or values_by_target["address"].get("raw_lat_lng")
+        set_value(
+            "import_row",
+            "raw_lat_lng",
+            stringify_value(raw_values_by_key.get("raw_lat_lng")) or values_by_target["address"].get("raw_lat_lng"),
+        )
     if not values_by_target["import_row"].get("raw_platform_name"):
-        values_by_target["import_row"]["raw_platform_name"] = stringify_value(raw_values_by_key.get("platform_name")) or customer_platform_name or loan_platform_name
+        set_value(
+            "import_row",
+            "raw_platform_name",
+            stringify_value(raw_values_by_key.get("platform_name")) or customer_platform_name or loan_platform_name,
+        )
     if not values_by_target["import_row"].get("raw_status"):
-        values_by_target["import_row"]["raw_status"] = stringify_value(raw_values_by_key.get("status")) or values_by_target["customer"].get("status")
+        set_value("import_row", "raw_status", stringify_value(raw_values_by_key.get("status")) or values_by_target["customer"].get("status"))
 
     customer = Customer(**values_by_target["customer"])
     loan = CustomerLoan(**values_by_target["loan"])
@@ -654,8 +733,9 @@ async def upload_customers(
         with open(temp_filepath, "wb") as f:
             f.write(contents)
 
-        expected_fields = UPLOAD_FIELD_DEFINITIONS
-        category_groups = build_category_groups()
+        runtime_columns_by_target = get_runtime_columns_by_target(db)
+        expected_fields = filter_field_definitions_by_runtime_columns(runtime_columns_by_target)
+        category_groups = build_category_groups(expected_fields)
 
         return templates.TemplateResponse(
             request,
@@ -732,6 +812,8 @@ async def process_customers_upload(
         count = 0
 
         agent_id_val = int(agent_id) if agent_id and agent_id.isdigit() else None
+        runtime_columns_by_target = get_runtime_columns_by_target(db)
+        visible_field_definitions = filter_field_definitions_by_runtime_columns(runtime_columns_by_target)
 
         headers = [str(cell).strip() if cell is not None else f"Column_{i}" for i, cell in enumerate(rows[0])]
 
@@ -750,6 +832,8 @@ async def process_customers_upload(
                 row=row_payload,
                 mapping=mapped_headers,
                 batch_code=batch_code,
+                field_definitions=visible_field_definitions,
+                runtime_columns_by_target=runtime_columns_by_target,
             )
 
             if not payload.customer.full_name:
