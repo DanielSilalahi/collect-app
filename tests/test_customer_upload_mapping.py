@@ -86,3 +86,49 @@ def test_runtime_insert_serializer_omits_customer_columns_missing_from_live_sche
     assert serialized["full_name"] == "Siti Aminah"
     assert serialized["primary_phone"] == "08123456789"
     assert "partner_name" not in serialized
+
+
+def test_runtime_insert_serializer_backfills_required_legacy_customer_columns():
+    result = build_customer_import_payload(
+        row={
+            "Nama": "IJUSRI PIRMATIA",
+            "No HP": "82386031271",
+            "Alamat": "Bukit Senang",
+        },
+        mapping={
+            "full_name": "Nama",
+            "primary_phone": "No HP",
+            "full_address": "Alamat",
+        },
+        batch_code="UPLOAD_20260416_100000",
+    )
+
+    runtime_columns_by_target = {
+        "customer": {
+            "name",
+            "address",
+            "phone",
+            "full_name",
+            "primary_phone",
+            "primary_address_summary",
+            "status",
+            "upload_batch",
+            "search_name",
+            "is_deleted",
+        },
+        "address": set(),
+        "loan": set(),
+        "contact": set(),
+        "import_row": set(),
+    }
+
+    serialized = serialize_model_for_runtime_insert(
+        result.customer,
+        "customer",
+        runtime_columns_by_target,
+    )
+
+    assert serialized["name"] == "IJUSRI PIRMATIA"
+    assert serialized["address"] == "Bukit Senang"
+    assert serialized["phone"] == "82386031271"
+    assert serialized["is_deleted"] == 0

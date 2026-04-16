@@ -371,6 +371,24 @@ def serialize_model_for_runtime_insert(model_instance, target, runtime_columns_b
         if column_name == "id":
             continue
         values[column_name] = getattr(model_instance, attr)
+
+    if target == "customer":
+        if "name" in runtime_columns and not values.get("name"):
+            values["name"] = (
+                getattr(model_instance, "full_name", None)
+                or getattr(model_instance, "nick_name", None)
+                or "-"
+            )
+        if "address" in runtime_columns and not values.get("address"):
+            values["address"] = getattr(model_instance, "primary_address_summary", None)
+        if "phone" in runtime_columns and not values.get("phone"):
+            values["phone"] = getattr(model_instance, "primary_phone", None)
+        if "outstanding_amount" in runtime_columns and not values.get("outstanding_amount"):
+            values["outstanding_amount"] = getattr(model_instance, "current_total_outstanding", None)
+        if "overdue_days" in runtime_columns and not values.get("overdue_days"):
+            values["overdue_days"] = getattr(model_instance, "current_dpd", None)
+        if "is_deleted" in runtime_columns and values.get("is_deleted") is None:
+            values["is_deleted"] = 0
     return values
 
 
@@ -884,13 +902,16 @@ async def process_customers_upload(
                 customer_update["current_dpd"] = payload.loan.overdue_days
             if "current_total_outstanding" in runtime_columns_by_target["customer"]:
                 customer_update["current_total_outstanding"] = payload.loan.total_outstanding
-            if customer_update:
-                db.execute(
-                    runtime_tables_by_target["customer"]
-                    .update()
-                    .where(runtime_tables_by_target["customer"].c.id == customer_id)
-                    .values(**customer_update)
-                )
+            if "loan_number" in runtime_columns_by_target["customer"]:
+                customer_update["loan_number"] = payload.loan.loan_number
+            if "platform_name" in runtime_columns_by_target["customer"] and not customer_insert.get("platform_name"):
+                customer_update["platform_name"] = payload.loan.platform_name or payload.customer.platform_name
+            if "outstanding_amount" in runtime_columns_by_target["customer"]:
+                customer_update["outstanding_amount"] = payload.loan.total_outstanding
+            if "due_date" in runtime_columns_by_target["customer"]:
+                customer_update["due_date"] = payload.loan.due_date
+            if "overdue_days" in runtime_columns_by_target["customer"]:
+                customer_update["overdue_days"] = payload.loan.overdue_days
 
             payload.address.customer_id = customer_id
             db.add(payload.address)
@@ -898,9 +919,20 @@ async def process_customers_upload(
             if payload.contact:
                 payload.contact.customer_id = customer_id
                 db.add(payload.contact)
+                if "emergency_contact_1_name" in runtime_columns_by_target["customer"] and not customer_update.get("emergency_contact_1_name"):
+                    customer_update["emergency_contact_1_name"] = payload.contact.name
+                if "emergency_contact_1_phone" in runtime_columns_by_target["customer"] and not customer_update.get("emergency_contact_1_phone"):
+                    customer_update["emergency_contact_1_phone"] = payload.contact.phone_number
 
             payload.import_row.customer_id = customer_id
             db.add(payload.import_row)
+            if customer_update:
+                db.execute(
+                    runtime_tables_by_target["customer"]
+                    .update()
+                    .where(runtime_tables_by_target["customer"].c.id == customer_id)
+                    .values(**customer_update)
+                )
             count += 1
 
         # Cleanup
