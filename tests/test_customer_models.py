@@ -9,6 +9,15 @@ from models.customer import Customer
 from models.customer_loan import CustomerLoan
 
 
+def test_customer_model_has_snapshot_columns():
+    columns = {column.name for column in Customer.__table__.columns}
+
+    assert "full_name" in columns
+    assert "primary_phone" in columns
+    assert "current_loan_id" in columns
+    assert "current_total_outstanding" in columns
+
+
 def test_customer_can_hold_current_loan_snapshot():
     engine = create_engine("sqlite:///:memory:")
     SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
