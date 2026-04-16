@@ -7,6 +7,7 @@ from datetime import date, datetime
 
 import openpyxl
 import pytz
+from sqlalchemy import MetaData, Table
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
@@ -343,6 +344,15 @@ def get_runtime_columns_by_target(db: Session):
     }
 
 
+def get_runtime_tables(db: Session):
+    metadata = MetaData()
+    bind = db.get_bind()
+    return {
+        target: Table(model.__table__.name, metadata, autoload_with=bind)
+        for target, model in TARGET_MODEL_BY_KEY.items()
+    }
+
+
 def filter_field_definitions_by_runtime_columns(runtime_columns_by_target):
     visible_fields = []
     for field in UPLOAD_FIELD_DEFINITIONS:
@@ -350,6 +360,18 @@ def filter_field_definitions_by_runtime_columns(runtime_columns_by_target):
         if column_name and column_name in runtime_columns_by_target.get(field["target"], set()):
             visible_fields.append(field)
     return visible_fields
+
+
+def serialize_model_for_runtime_insert(model_instance, target, runtime_columns_by_target):
+    values = {}
+    runtime_columns = runtime_columns_by_target.get(target, set())
+    for attr, column_name in TARGET_ATTR_COLUMN_BY_KEY[target].items():
+        if column_name not in runtime_columns:
+            continue
+        if column_name == "id":
+            continue
+        values[column_name] = getattr(model_instance, attr)
+    return values
 
 
 def build_category_groups(field_definitions=None):
@@ -813,6 +835,7 @@ async def process_customers_upload(
 
         agent_id_val = int(agent_id) if agent_id and agent_id.isdigit() else None
         runtime_columns_by_target = get_runtime_columns_by_target(db)
+        runtime_tables_by_target = get_runtime_tables(db)
         visible_field_definitions = filter_field_definitions_by_runtime_columns(runtime_columns_by_target)
 
         headers = [str(cell).strip() if cell is not None else f"Column_{i}" for i, cell in enumerate(rows[0])]
@@ -839,27 +862,44 @@ async def process_customers_upload(
             if not payload.customer.full_name:
                 continue
 
-            customer = payload.customer
-            customer.assigned_agent_id = agent_id_val
-            db.add(customer)
-            db.flush()
+            payload.customer.assigned_agent_id = agent_id_val
+            customer_insert = serialize_model_for_runtime_insert(
+                payload.customer,
+                "customer",
+                runtime_columns_by_target,
+            )
+            customer_result = db.execute(
+                runtime_tables_by_target["customer"].insert().values(**customer_insert)
+            )
+            customer_id = customer_result.inserted_primary_key[0]
 
-            payload.loan.customer_id = customer.id
+            payload.loan.customer_id = customer_id
             db.add(payload.loan)
             db.flush()
 
-            customer.current_loan_id = payload.loan.id
-            customer.current_dpd = payload.loan.overdue_days
-            customer.current_total_outstanding = payload.loan.total_outstanding
+            customer_update = {}
+            if "current_loan_id" in runtime_columns_by_target["customer"]:
+                customer_update["current_loan_id"] = payload.loan.id
+            if "current_dpd" in runtime_columns_by_target["customer"]:
+                customer_update["current_dpd"] = payload.loan.overdue_days
+            if "current_total_outstanding" in runtime_columns_by_target["customer"]:
+                customer_update["current_total_outstanding"] = payload.loan.total_outstanding
+            if customer_update:
+                db.execute(
+                    runtime_tables_by_target["customer"]
+                    .update()
+                    .where(runtime_tables_by_target["customer"].c.id == customer_id)
+                    .values(**customer_update)
+                )
 
-            payload.address.customer_id = customer.id
+            payload.address.customer_id = customer_id
             db.add(payload.address)
 
             if payload.contact:
-                payload.contact.customer_id = customer.id
+                payload.contact.customer_id = customer_id
                 db.add(payload.contact)
 
-            payload.import_row.customer_id = customer.id
+            payload.import_row.customer_id = customer_id
             db.add(payload.import_row)
             count += 1
 
