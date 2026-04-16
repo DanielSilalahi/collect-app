@@ -606,7 +606,7 @@ def bulk_delete_customers(
         referer = referer.split("?")[0]
 
     return RedirectResponse(
-        f"{referer}?success={quote(f'Berhasil menghapus {deleted_count} data customer')}",
+        f"{referer}?success={quote(f'Berhasil menghapus {updated} data customer')}",
         status_code=302,
     )
 
@@ -637,7 +637,7 @@ def delete_batch(
     db.commit()
 
     return RedirectResponse(
-        f"/customers?success={quote(f'Batch {batch_code} dan {count} data di dalamnya berhasil dihapus')}",
+        f"/customers?success={quote(f'Batch {batch_code} dan {updated} data di dalamnya berhasil dihapus')}",
         status_code=302,
     )
 
