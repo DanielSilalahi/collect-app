@@ -1,7 +1,9 @@
 import io
 import math
+import re
 from urllib.parse import quote
-from datetime import datetime
+from collections import namedtuple
+from datetime import date, datetime
 
 import openpyxl
 import pytz
@@ -13,9 +15,177 @@ from core.database import get_db
 from core.templates import templates
 from models.user import User
 from models.customer import Customer
+from models.customer_address import CustomerAddress
+from models.customer_contact import CustomerContact
+from models.customer_import_row import CustomerImportRow
+from models.customer_loan import CustomerLoan
 from models.activity_log import ActivityLog
 
 router = APIRouter(tags=["Customer Management"])
+CustomerImportPayload = namedtuple(
+    "CustomerImportPayload",
+    ["customer", "loan", "address", "contact", "import_row"],
+)
+
+
+def clean_string(value):
+    if value is None:
+        return None
+    value = str(value).strip()
+    if not value or value.lower() == "none":
+        return None
+    return value
+
+
+def normalize_text(value):
+    cleaned = clean_string(value)
+    if not cleaned:
+        return None
+    lowered = cleaned.lower()
+    return re.sub(r"\s+", " ", lowered).strip()
+
+
+def stringify_value(value):
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.isoformat(sep=" ")
+    if isinstance(value, date):
+        return value.isoformat()
+    return str(value)
+
+
+def parse_int(value):
+    value = clean_string(value)
+    if value is None:
+        return None
+    try:
+        return int(float(value.replace(",", "")))
+    except Exception:
+        return None
+
+
+def parse_float(value):
+    value = clean_string(value)
+    if value is None:
+        return None
+    try:
+        return float(value.replace(",", ""))
+    except Exception:
+        return None
+
+
+def parse_decimal(value):
+    parsed = parse_float(value)
+    if parsed is None:
+        return None
+    if float(parsed).is_integer():
+        return int(parsed)
+    return parsed
+
+
+def parse_date(value):
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    raw = clean_string(value)
+    if raw is None:
+        return None
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(raw[:10], fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def get_val(row, mapping, field_name):
+    source_key = mapping.get(field_name)
+    if source_key is None:
+        return None
+    if isinstance(row, dict):
+        return row.get(source_key)
+    return None
+
+
+def build_customer_import_payload(row, mapping, batch_code):
+    full_name = clean_string(get_val(row, mapping, "full_name"))
+    primary_phone = clean_string(get_val(row, mapping, "primary_phone"))
+    full_address = clean_string(get_val(row, mapping, "full_address"))
+    city = clean_string(get_val(row, mapping, "city"))
+    platform_name = clean_string(get_val(row, mapping, "platform_name"))
+    raw_lat_lng = clean_string(get_val(row, mapping, "raw_lat_lng"))
+
+    customer = Customer(
+        full_name=full_name,
+        primary_phone=primary_phone,
+        primary_address_summary=full_address,
+        primary_city=city,
+        platform_name=platform_name,
+        assigned_agent_id=None,
+        status="new",
+        upload_batch=batch_code,
+        search_name=normalize_text(full_name),
+    )
+
+    loan = CustomerLoan(
+        is_current=1,
+        loan_number=clean_string(get_val(row, mapping, "loan_number")),
+        platform_name=platform_name,
+        total_outstanding=parse_decimal(get_val(row, mapping, "total_outstanding")),
+        overdue_days=parse_int(get_val(row, mapping, "overdue_days")),
+        due_date=parse_date(get_val(row, mapping, "due_date")),
+    )
+
+    address = CustomerAddress(
+        address_type="home",
+        full_address=full_address or "-",
+        city=city,
+        lat=parse_float(get_val(row, mapping, "lat")),
+        lng=parse_float(get_val(row, mapping, "lng")),
+        raw_lat_lng=raw_lat_lng,
+        is_primary=1,
+    )
+
+    emergency_name = clean_string(get_val(row, mapping, "emergency_contact_name"))
+    emergency_phone = clean_string(get_val(row, mapping, "emergency_contact_phone"))
+    contact = None
+    if emergency_name or emergency_phone:
+        contact = CustomerContact(
+            contact_type="phone",
+            contact_role="emergency",
+            name=emergency_name,
+            phone_number=emergency_phone,
+            is_primary=0,
+        )
+
+    import_row = CustomerImportRow(
+        upload_batch=batch_code,
+        import_status="imported",
+        raw_customer_name=full_name,
+        raw_phone=primary_phone,
+        raw_address=full_address,
+        raw_city=city,
+        raw_due_date=stringify_value(get_val(row, mapping, "due_date")),
+        raw_outstanding_amount=stringify_value(get_val(row, mapping, "total_outstanding")),
+        raw_overdue_days=stringify_value(get_val(row, mapping, "overdue_days")),
+        raw_lat=str(parse_float(get_val(row, mapping, "lat"))) if parse_float(get_val(row, mapping, "lat")) is not None else None,
+        raw_lng=str(parse_float(get_val(row, mapping, "lng"))) if parse_float(get_val(row, mapping, "lng")) is not None else None,
+        raw_lat_lng=raw_lat_lng,
+        raw_platform_name=platform_name,
+        raw_payload=dict(row),
+    )
+
+    return CustomerImportPayload(
+        customer=customer,
+        loan=loan,
+        address=address,
+        contact=contact,
+        import_row=import_row,
+    )
 
 
 def _require_admin(request: Request, db: Session):
@@ -95,7 +265,7 @@ def customer_batch_detail(
     if agent_id and agent_id.isdigit():
         query = query.filter(Customer.assigned_agent_id == int(agent_id))
     if search:
-        query = query.filter(Customer.name.ilike(f"%{search}%"))
+        query = query.filter(Customer.full_name.ilike(f"%{search}%"))
 
     total = query.count()
     total_pages = math.ceil(total / per_page) if total > 0 else 1
@@ -184,20 +354,20 @@ async def upload_customers(
 
         # Define the expected database fields for mapping
         expected_fields = [
-            {"key": "name", "label": "Nama (Wajib)", "required": True},
-            {"key": "address", "label": "Alamat", "required": False},
-            {"key": "phone", "label": "Phone", "required": False},
+            {"key": "full_name", "label": "Nama (Wajib)", "required": True},
+            {"key": "primary_phone", "label": "No. HP Utama", "required": False},
+            {"key": "full_address", "label": "Alamat Utama", "required": False},
+            {"key": "city", "label": "Kota", "required": False},
             {"key": "loan_number", "label": "Nomor Kontrak / Loan Number", "required": False},
             {"key": "platform_name", "label": "Platform / Aplikasi", "required": False},
-            {"key": "outstanding_amount", "label": "Outstanding Amount", "required": False},
+            {"key": "total_outstanding", "label": "Outstanding Amount", "required": False},
             {"key": "overdue_days", "label": "Overdue (DPD)", "required": False},
-            {"key": "due_date", "label": "Tanggal Jatuh Tempo (Date)", "required": False},
-            {"key": "emergency_contact_1_name", "label": "Emergency Contact 1 (Name)", "required": False},
-            {"key": "emergency_contact_1_phone", "label": "Emergency Contact 1 (Phone)", "required": False},
-            {"key": "emergency_contact_2_name", "label": "Emergency Contact 2 (Name)", "required": False},
-            {"key": "emergency_contact_2_phone", "label": "Emergency Contact 2 (Phone)", "required": False},
+            {"key": "due_date", "label": "Tanggal Jatuh Tempo", "required": False},
+            {"key": "raw_lat_lng", "label": "Latitude & Longitude Gabungan", "required": False},
             {"key": "lat", "label": "Latitude (GPS)", "required": False},
             {"key": "lng", "label": "Longitude (GPS)", "required": False},
+            {"key": "emergency_contact_name", "label": "Emergency Contact Name", "required": False},
+            {"key": "emergency_contact_phone", "label": "Emergency Contact Phone", "required": False},
         ]
 
         return templates.TemplateResponse(
@@ -251,7 +421,7 @@ async def process_customers_upload(
                 if col_idx_str and col_idx_str.isdigit():
                     mapping[field_name] = int(col_idx_str)
 
-        if "name" not in mapping:
+        if "full_name" not in mapping:
              return RedirectResponse(
                 f"/customers?error={quote('Mapping kolom Nama wajib diisi.')}",
                 status_code=302,
@@ -275,118 +445,50 @@ async def process_customers_upload(
 
         agent_id_val = int(agent_id) if agent_id and agent_id.isdigit() else None
 
+        headers = [str(cell).strip() if cell is not None else f"Column_{i}" for i, cell in enumerate(rows[0])]
+
         for row in rows[1:]:
             if all(v is None for v in row):
                 continue
-            
-            # Extract mapped column values
-            def get_val(field):
-                if field in mapping:
-                    idx = mapping[field]
-                    if idx < len(row):
-                        return row[idx]
-                return None
 
-            name = get_val("name")
-            name = str(name).strip() if name is not None else None
-            
-            if not name or name.lower() == "none":
+            row_payload = {headers[idx]: row[idx] if idx < len(row) else None for idx in range(len(headers))}
+            mapped_headers = {
+                field_name: headers[col_idx]
+                for field_name, col_idx in mapping.items()
+                if col_idx < len(headers)
+            }
+
+            payload = build_customer_import_payload(
+                row=row_payload,
+                mapping=mapped_headers,
+                batch_code=batch_code,
+            )
+
+            if not payload.customer.full_name:
                 continue
 
-            address = get_val("address")
-            address = str(address).strip() if address is not None else None
-            
-            phone = get_val("phone")
-            phone = str(phone).strip() if phone is not None else None
-            
-            loan_number = get_val("loan_number")
-            loan_number = str(loan_number).strip() if loan_number is not None else None
-            
-            platform_name = get_val("platform_name")
-            platform_name = str(platform_name).strip() if platform_name is not None else None
-            
-            # Numeric types
-            outstanding_amount = None
-            out_val = get_val("outstanding_amount")
-            if out_val is not None and str(out_val).strip() != "None":
-                try:
-                    outstanding_amount = float(str(out_val).replace(',','').strip())
-                except:
-                    pass
-
-            overdue_days = None
-            od_val = get_val("overdue_days")
-            if od_val is not None and str(od_val).strip() != "None":
-                try:
-                    overdue_days = int(str(od_val).split('.')[0].strip())
-                except:
-                    pass
-            
-            # Date types
-            due_date = None
-            dd_val = get_val("due_date")
-            if dd_val is not None and str(dd_val).strip() != "None":
-                import datetime as dt_mod
-                if isinstance(dd_val, dt_mod.datetime) or isinstance(dd_val, dt_mod.date):
-                    due_date = dd_val
-                else:
-                    try:
-                        due_date = datetime.strptime(str(dd_val).strip()[:10], "%Y-%m-%d")
-                    except:
-                        pass
-            
-            # Emergency contacts
-            v = get_val("emergency_contact_1_name")
-            ec1_name = str(v).strip() if v is not None and str(v).strip() != "None" else None
-            
-            v = get_val("emergency_contact_1_phone")
-            ec1_phone = str(v).strip() if v is not None and str(v).strip() != "None" else None
-            
-            v = get_val("emergency_contact_2_name")
-            ec2_name = str(v).strip() if v is not None and str(v).strip() != "None" else None
-            
-            v = get_val("emergency_contact_2_phone")
-            ec2_phone = str(v).strip() if v is not None and str(v).strip() != "None" else None
-
-            # Handle "None" string literal check
-            address = address if address and address.lower() != "none" else None
-            phone = phone if phone and phone.lower() != "none" else None
-            loan_number = loan_number if loan_number and loan_number.lower() != "none" else None
-            platform_name = platform_name if platform_name and platform_name.lower() != "none" else None
-
-            # GPS
-            lat_val = get_val("lat")
-            lat = None
-            if lat_val is not None and str(lat_val).strip() != "None":
-                try: lat = float(str(lat_val).strip())
-                except: pass
-
-            lng_val = get_val("lng")
-            lng = None
-            if lng_val is not None and str(lng_val).strip() != "None":
-                try: lng = float(str(lng_val).strip())
-                except: pass
-
-            customer = Customer(
-                name=name,
-                address=address,
-                phone=phone,
-                loan_number=loan_number,
-                platform_name=platform_name,
-                outstanding_amount=outstanding_amount,
-                overdue_days=overdue_days,
-                due_date=due_date,
-                emergency_contact_1_name=ec1_name,
-                emergency_contact_1_phone=ec1_phone,
-                emergency_contact_2_name=ec2_name,
-                emergency_contact_2_phone=ec2_phone,
-                lat=lat,
-                lng=lng,
-                assigned_agent_id=agent_id_val,
-                upload_batch=batch_code,
-                status="belum",
-            )
+            customer = payload.customer
+            customer.assigned_agent_id = agent_id_val
             db.add(customer)
+            db.flush()
+
+            payload.loan.customer_id = customer.id
+            db.add(payload.loan)
+            db.flush()
+
+            customer.current_loan_id = payload.loan.id
+            customer.current_dpd = payload.loan.overdue_days
+            customer.current_total_outstanding = payload.loan.total_outstanding
+
+            payload.address.customer_id = customer.id
+            db.add(payload.address)
+
+            if payload.contact:
+                payload.contact.customer_id = customer.id
+                db.add(payload.contact)
+
+            payload.import_row.customer_id = customer.id
+            db.add(payload.import_row)
             count += 1
 
         # Cleanup
@@ -558,7 +660,7 @@ def delete_customer(
             status_code=302,
         )
 
-    name = customer.name
+    name = customer.full_name
     customer.is_deleted = 1
 
     log = ActivityLog(

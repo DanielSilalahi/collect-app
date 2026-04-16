@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import relationship
 
 from core.database import Base
@@ -38,6 +38,6 @@ class CustomerImportRow(Base):
     raw_lat_lng = Column(String(255), nullable=True)
     raw_platform_name = Column(String(100), nullable=True)
     raw_status = Column(String(100), nullable=True)
-    raw_payload = Column(Text, nullable=True)
+    raw_payload = Column(JSON, nullable=True)
 
     customer = relationship("Customer", back_populates="import_rows")

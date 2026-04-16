@@ -1,4 +1,4 @@
-from services.customer_import import build_customer_import_payload
+from controllers.dashboard.customer_controller import build_customer_import_payload
 
 
 def test_import_row_preserves_raw_lat_lng_and_snapshot_fields():
