@@ -102,6 +102,207 @@ def parse_date(value):
     return None
 
 
+FIELD_PARSER_BY_TYPE = {
+    "string": clean_string,
+    "int": parse_int,
+    "float": parse_float,
+    "decimal": parse_decimal,
+    "date": parse_date,
+}
+
+CATEGORY_META = {
+    "identity": {
+        "label": "Identitas Customer",
+        "icon": "bi-person-vcard",
+        "description": "Snapshot utama customer untuk identitas, status, dan pencarian dasar.",
+    },
+    "location": {
+        "label": "Alamat & Lokasi",
+        "icon": "bi-geo-alt",
+        "description": "Alamat utama, detail domisili, dan koordinat lokasi yang terkait customer.",
+    },
+    "loan": {
+        "label": "Pinjaman Aktif",
+        "icon": "bi-cash-coin",
+        "description": "Field bisnis untuk pinjaman saat ini, outstanding, DPD, pembayaran, dan status collection.",
+    },
+    "contact": {
+        "label": "Kontak Tambahan",
+        "icon": "bi-telephone-forward",
+        "description": "Kontak darurat atau kontak lain yang berhubungan dengan customer.",
+    },
+    "import_meta": {
+        "label": "Metadata Import",
+        "icon": "bi-archive",
+        "description": "Metadata partner dan raw field yang disimpan untuk audit hasil upload.",
+    },
+}
+
+UPLOAD_FIELD_SPECS = [
+    ("identity", "full_name", "Nama Lengkap", True, "customer", "full_name", "string"),
+    ("identity", "nick_name", "Nama Panggilan", False, "customer", "nick_name", "string"),
+    ("identity", "customer_code", "Kode Customer", False, "customer", "customer_code", "string"),
+    ("identity", "external_customer_id", "External Customer ID", False, "customer", "external_customer_id", "string"),
+    ("identity", "platform_name", "Platform Customer", False, "customer", "platform_name", "string"),
+    ("identity", "partner_name", "Nama Partner", False, "customer", "partner_name", "string"),
+    ("identity", "nik", "NIK", False, "customer", "nik", "string"),
+    ("identity", "birth_date", "Tanggal Lahir", False, "customer", "birth_date", "date"),
+    ("identity", "gender", "Gender", False, "customer", "gender", "string"),
+    ("identity", "email", "Email Customer", False, "customer", "email", "string"),
+    ("identity", "primary_phone", "No. HP Utama", False, "customer", "primary_phone", "string"),
+    ("identity", "primary_city", "Kota Snapshot", False, "customer", "primary_city", "string"),
+    ("identity", "primary_address_summary", "Ringkasan Alamat Snapshot", False, "customer", "primary_address_summary", "string"),
+    ("identity", "status", "Status Customer", False, "customer", "status", "string"),
+    ("identity", "sub_status", "Sub Status Customer", False, "customer", "sub_status", "string"),
+    ("identity", "current_dpd", "Current DPD Snapshot", False, "customer", "current_dpd", "int"),
+    ("identity", "current_total_outstanding", "Current Total Outstanding Snapshot", False, "customer", "current_total_outstanding", "decimal"),
+    ("identity", "last_payment_date", "Tanggal Pembayaran Terakhir Snapshot", False, "customer", "last_payment_date", "date"),
+    ("identity", "last_payment_amount", "Nominal Pembayaran Terakhir Snapshot", False, "customer", "last_payment_amount", "decimal"),
+    ("identity", "customer_notes", "Catatan Customer", False, "customer", "notes", "string"),
+    ("location", "address_type", "Tipe Alamat", False, "address", "address_type", "string"),
+    ("location", "label", "Label Alamat", False, "address", "label", "string"),
+    ("location", "recipient_name", "Nama Penerima Alamat", False, "address", "recipient_name", "string"),
+    ("location", "full_address", "Alamat Lengkap", False, "address", "full_address", "string"),
+    ("location", "street", "Jalan", False, "address", "street", "string"),
+    ("location", "block", "Blok", False, "address", "block", "string"),
+    ("location", "house_number", "Nomor Rumah", False, "address", "house_number", "string"),
+    ("location", "rt", "RT", False, "address", "rt", "string"),
+    ("location", "rw", "RW", False, "address", "rw", "string"),
+    ("location", "kelurahan", "Kelurahan", False, "address", "kelurahan", "string"),
+    ("location", "kecamatan", "Kecamatan", False, "address", "kecamatan", "string"),
+    ("location", "city", "Kota Alamat", False, "address", "city", "string"),
+    ("location", "province", "Provinsi", False, "address", "province", "string"),
+    ("location", "postal_code", "Kode Pos", False, "address", "postal_code", "string"),
+    ("location", "country", "Negara", False, "address", "country", "string"),
+    ("location", "landmark", "Patokan", False, "address", "landmark", "string"),
+    ("location", "address_note", "Catatan Alamat", False, "address", "address_note", "string"),
+    ("location", "residence_status", "Status Tempat Tinggal", False, "address", "residence_status", "string"),
+    ("location", "is_primary", "Alamat Utama", False, "address", "is_primary", "int"),
+    ("location", "is_active", "Alamat Aktif", False, "address", "is_active", "int"),
+    ("location", "lat", "Latitude", False, "address", "lat", "float"),
+    ("location", "lng", "Longitude", False, "address", "lng", "float"),
+    ("location", "map_url", "Map URL", False, "address", "map_url", "string"),
+    ("location", "coordinate_source", "Sumber Koordinat", False, "address", "coordinate_source", "string"),
+    ("location", "coordinate_accuracy_meters", "Akurasi Koordinat (meter)", False, "address", "coordinate_accuracy_meters", "float"),
+    ("location", "is_location_verified", "Lokasi Terverifikasi", False, "address", "is_location_verified", "int"),
+    ("location", "raw_lat", "Raw Latitude", False, "address", "raw_lat", "string"),
+    ("location", "raw_lng", "Raw Longitude", False, "address", "raw_lng", "string"),
+    ("location", "raw_lat_lng", "Raw Latitude & Longitude", False, "address", "raw_lat_lng", "string"),
+    ("location", "raw_map_link", "Raw Map Link", False, "address", "raw_map_link", "string"),
+    ("loan", "is_current", "Loan Aktif Saat Ini", False, "loan", "is_current", "int"),
+    ("loan", "application_id", "Application ID", False, "loan", "application_id", "string"),
+    ("loan", "loan_number", "Loan Number", False, "loan", "loan_number", "string"),
+    ("loan", "contract_number", "Contract Number", False, "loan", "contract_number", "string"),
+    ("loan", "agreement_number", "Agreement Number", False, "loan", "agreement_number", "string"),
+    ("loan", "product_type", "Tipe Produk", False, "loan", "product_type", "string"),
+    ("loan", "product_name", "Nama Produk", False, "loan", "product_name", "string"),
+    ("loan", "loan_platform_name", "Platform Loan", False, "loan", "platform_name", "string"),
+    ("loan", "disbursement_date", "Tanggal Disbursement", False, "loan", "disbursement_date", "date"),
+    ("loan", "first_due_date", "Tanggal Jatuh Tempo Pertama", False, "loan", "first_due_date", "date"),
+    ("loan", "due_date", "Tanggal Jatuh Tempo", False, "loan", "due_date", "date"),
+    ("loan", "last_due_date", "Tanggal Jatuh Tempo Terakhir", False, "loan", "last_due_date", "date"),
+    ("loan", "maturity_date", "Tanggal Maturity", False, "loan", "maturity_date", "date"),
+    ("loan", "tenor", "Tenor", False, "loan", "tenor", "int"),
+    ("loan", "installment_number", "Installment Number", False, "loan", "installment_number", "int"),
+    ("loan", "remaining_installment_count", "Sisa Cicilan", False, "loan", "remaining_installment_count", "int"),
+    ("loan", "payment_frequency", "Frekuensi Pembayaran", False, "loan", "payment_frequency", "string"),
+    ("loan", "loan_amount", "Loan Amount", False, "loan", "loan_amount", "decimal"),
+    ("loan", "principal_amount", "Principal Amount", False, "loan", "principal_amount", "decimal"),
+    ("loan", "interest_amount", "Interest Amount", False, "loan", "interest_amount", "decimal"),
+    ("loan", "admin_fee_amount", "Admin Fee Amount", False, "loan", "admin_fee_amount", "decimal"),
+    ("loan", "penalty_amount", "Penalty Amount", False, "loan", "penalty_amount", "decimal"),
+    ("loan", "insurance_fee_amount", "Insurance Fee Amount", False, "loan", "insurance_fee_amount", "decimal"),
+    ("loan", "other_fee_amount", "Other Fee Amount", False, "loan", "other_fee_amount", "decimal"),
+    ("loan", "installment_amount", "Installment Amount", False, "loan", "installment_amount", "decimal"),
+    ("loan", "outstanding_principal", "Outstanding Principal", False, "loan", "outstanding_principal", "decimal"),
+    ("loan", "outstanding_interest", "Outstanding Interest", False, "loan", "outstanding_interest", "decimal"),
+    ("loan", "outstanding_penalty", "Outstanding Penalty", False, "loan", "outstanding_penalty", "decimal"),
+    ("loan", "outstanding_fee", "Outstanding Fee", False, "loan", "outstanding_fee", "decimal"),
+    ("loan", "total_outstanding", "Total Outstanding", False, "loan", "total_outstanding", "decimal"),
+    ("loan", "remaining_balance", "Remaining Balance", False, "loan", "remaining_balance", "decimal"),
+    ("loan", "overdue_days", "Overdue Days", False, "loan", "overdue_days", "int"),
+    ("loan", "days_past_due", "Days Past Due", False, "loan", "days_past_due", "int"),
+    ("loan", "dpd_bucket", "DPD Bucket", False, "loan", "dpd_bucket", "string"),
+    ("loan", "aging_bucket", "Aging Bucket", False, "loan", "aging_bucket", "string"),
+    ("loan", "bucket_code", "Bucket Code", False, "loan", "bucket_code", "string"),
+    ("loan", "loan_status", "Loan Status", False, "loan", "loan_status", "string"),
+    ("loan", "billing_status", "Billing Status", False, "loan", "billing_status", "string"),
+    ("loan", "collection_stage", "Collection Stage", False, "loan", "collection_stage", "string"),
+    ("loan", "risk_segment", "Risk Segment", False, "loan", "risk_segment", "string"),
+    ("loan", "risk_score", "Risk Score", False, "loan", "risk_score", "string"),
+    ("loan", "loan_last_payment_date", "Tanggal Pembayaran Terakhir Loan", False, "loan", "last_payment_date", "date"),
+    ("loan", "loan_last_payment_amount", "Nominal Pembayaran Terakhir Loan", False, "loan", "last_payment_amount", "decimal"),
+    ("loan", "last_payment_channel", "Channel Pembayaran Terakhir", False, "loan", "last_payment_channel", "string"),
+    ("loan", "last_payment_reference", "Referensi Pembayaran Terakhir", False, "loan", "last_payment_reference", "string"),
+    ("loan", "paid_amount_total", "Total Paid Amount", False, "loan", "paid_amount_total", "decimal"),
+    ("loan", "payment_status", "Payment Status", False, "loan", "payment_status", "string"),
+    ("loan", "promise_to_pay_date", "Tanggal Promise To Pay", False, "loan", "promise_to_pay_date", "date"),
+    ("loan", "promise_to_pay_amount", "Nominal Promise To Pay", False, "loan", "promise_to_pay_amount", "decimal"),
+    ("loan", "promise_to_pay_status", "Status Promise To Pay", False, "loan", "promise_to_pay_status", "string"),
+    ("loan", "broken_ptp_count", "Broken PTP Count", False, "loan", "broken_ptp_count", "int"),
+    ("loan", "settlement_offer_amount", "Settlement Offer Amount", False, "loan", "settlement_offer_amount", "decimal"),
+    ("loan", "settlement_expiry_date", "Settlement Expiry Date", False, "loan", "settlement_expiry_date", "date"),
+    ("loan", "minimum_payment_amount", "Minimum Payment Amount", False, "loan", "minimum_payment_amount", "decimal"),
+    ("contact", "contact_type", "Tipe Kontak", False, "contact", "contact_type", "string"),
+    ("contact", "contact_role", "Peran Kontak", False, "contact", "contact_role", "string"),
+    ("contact", "contact_name", "Nama Kontak", False, "contact", "name", "string"),
+    ("contact", "relationship_label", "Relationship", False, "contact", "relationship_label", "string"),
+    ("contact", "contact_phone_number", "No. HP Kontak", False, "contact", "phone_number", "string"),
+    ("contact", "contact_email", "Email Kontak", False, "contact", "email", "string"),
+    ("contact", "contact_is_primary", "Kontak Utama", False, "contact", "is_primary", "int"),
+    ("contact", "priority_order", "Priority Order", False, "contact", "priority_order", "int"),
+    ("contact", "is_whatsapp", "Nomor WhatsApp", False, "contact", "is_whatsapp", "int"),
+    ("contact", "contact_is_active", "Kontak Aktif", False, "contact", "is_active", "int"),
+    ("contact", "is_verified", "Kontak Terverifikasi", False, "contact", "is_verified", "int"),
+    ("contact", "is_valid", "Kontak Valid", False, "contact", "is_valid", "int"),
+    ("contact", "verification_source", "Sumber Verifikasi", False, "contact", "verification_source", "string"),
+    ("contact", "contact_notes", "Catatan Kontak", False, "contact", "notes", "string"),
+    ("import_meta", "source_partner_name", "Source Partner Name", False, "import_row", "source_partner_name", "string"),
+    ("import_meta", "source_partner_code", "Source Partner Code", False, "import_row", "source_partner_code", "string"),
+    ("import_meta", "source_file_name", "Source File Name", False, "import_row", "source_file_name", "string"),
+    ("import_meta", "source_sheet_name", "Source Sheet Name", False, "import_row", "source_sheet_name", "string"),
+    ("import_meta", "source_row_number", "Source Row Number", False, "import_row", "source_row_number", "int"),
+    ("import_meta", "mapping_profile_name", "Mapping Profile Name", False, "import_row", "mapping_profile_name", "string"),
+    ("import_meta", "import_version", "Import Version", False, "import_row", "import_version", "string"),
+    ("import_meta", "import_status", "Import Status", False, "import_row", "import_status", "string"),
+    ("import_meta", "import_error_flag", "Import Error Flag", False, "import_row", "import_error_flag", "int"),
+    ("import_meta", "import_error_message", "Import Error Message", False, "import_row", "import_error_message", "string"),
+    ("import_meta", "raw_customer_name", "Raw Customer Name", False, "import_row", "raw_customer_name", "string"),
+    ("import_meta", "raw_nik", "Raw NIK", False, "import_row", "raw_nik", "string"),
+    ("import_meta", "raw_phone", "Raw Phone", False, "import_row", "raw_phone", "string"),
+    ("import_meta", "raw_phone_2", "Raw Phone 2", False, "import_row", "raw_phone_2", "string"),
+    ("import_meta", "raw_address", "Raw Address", False, "import_row", "raw_address", "string"),
+    ("import_meta", "raw_city", "Raw City", False, "import_row", "raw_city", "string"),
+    ("import_meta", "raw_due_date", "Raw Due Date", False, "import_row", "raw_due_date", "string"),
+    ("import_meta", "raw_disbursement_date", "Raw Disbursement Date", False, "import_row", "raw_disbursement_date", "string"),
+    ("import_meta", "raw_loan_amount", "Raw Loan Amount", False, "import_row", "raw_loan_amount", "string"),
+    ("import_meta", "raw_installment_amount", "Raw Installment Amount", False, "import_row", "raw_installment_amount", "string"),
+    ("import_meta", "raw_outstanding_amount", "Raw Outstanding Amount", False, "import_row", "raw_outstanding_amount", "string"),
+    ("import_meta", "raw_overdue_days", "Raw Overdue Days", False, "import_row", "raw_overdue_days", "string"),
+    ("import_meta", "raw_platform_name", "Raw Platform Name", False, "import_row", "raw_platform_name", "string"),
+    ("import_meta", "raw_status", "Raw Status", False, "import_row", "raw_status", "string"),
+]
+
+UPLOAD_FIELD_DEFINITIONS = [
+    {
+        "category": category,
+        "key": key,
+        "label": label,
+        "required": required,
+        "target": target,
+        "attr": attr,
+        "type": field_type,
+    }
+    for category, key, label, required, target, attr, field_type in UPLOAD_FIELD_SPECS
+]
+
+FIELD_DEFINITION_BY_KEY = {field["key"]: field for field in UPLOAD_FIELD_DEFINITIONS}
+LEGACY_FIELD_ALIASES = {
+    "emergency_contact_name": "contact_name",
+    "emergency_contact_phone": "contact_phone_number",
+}
+
+
 def get_val(row, mapping, field_name):
     source_key = mapping.get(field_name)
     if source_key is None:
@@ -111,73 +312,170 @@ def get_val(row, mapping, field_name):
     return None
 
 
+def parse_mapped_value(row, mapping, field_name):
+    field_definition = FIELD_DEFINITION_BY_KEY.get(field_name)
+    if not field_definition:
+        return None
+    parser = FIELD_PARSER_BY_TYPE[field_definition["type"]]
+    return parser(get_val(row, mapping, field_name))
+
+
+def build_category_groups():
+    groups = []
+    for category_key, meta in CATEGORY_META.items():
+        groups.append(
+            {
+                "key": category_key,
+                "label": meta["label"],
+                "icon": meta["icon"],
+                "description": meta["description"],
+                "fields": [
+                    field for field in UPLOAD_FIELD_DEFINITIONS if field["category"] == category_key
+                ],
+            }
+        )
+    return groups
+
+
+def resolve_mapping_value(row, mapping, field_name, *aliases):
+    for candidate in (field_name, *aliases):
+        if candidate not in mapping:
+            continue
+        if candidate in FIELD_DEFINITION_BY_KEY:
+            return parse_mapped_value(row, mapping, candidate)
+        return clean_string(get_val(row, mapping, candidate))
+    return None
+
+
 def build_customer_import_payload(row, mapping, batch_code):
-    full_name = clean_string(get_val(row, mapping, "full_name"))
-    primary_phone = clean_string(get_val(row, mapping, "primary_phone"))
-    full_address = clean_string(get_val(row, mapping, "full_address"))
-    city = clean_string(get_val(row, mapping, "city"))
-    platform_name = clean_string(get_val(row, mapping, "platform_name"))
-    raw_lat_lng = clean_string(get_val(row, mapping, "raw_lat_lng"))
+    normalized_mapping = {LEGACY_FIELD_ALIASES.get(key, key): value for key, value in mapping.items()}
+    values_by_target = {key: {} for key in ("customer", "address", "loan", "contact", "import_row")}
+    raw_values_by_key = {}
 
-    customer = Customer(
-        full_name=full_name,
-        primary_phone=primary_phone,
-        primary_address_summary=full_address,
-        primary_city=city,
-        platform_name=platform_name,
-        assigned_agent_id=None,
-        status="new",
-        upload_batch=batch_code,
-        search_name=normalize_text(full_name),
-    )
-
-    loan = CustomerLoan(
-        is_current=1,
-        loan_number=clean_string(get_val(row, mapping, "loan_number")),
-        platform_name=platform_name,
-        total_outstanding=parse_decimal(get_val(row, mapping, "total_outstanding")),
-        overdue_days=parse_int(get_val(row, mapping, "overdue_days")),
-        due_date=parse_date(get_val(row, mapping, "due_date")),
-    )
-
-    address = CustomerAddress(
-        address_type="home",
-        full_address=full_address or "-",
-        city=city,
-        lat=parse_float(get_val(row, mapping, "lat")),
-        lng=parse_float(get_val(row, mapping, "lng")),
-        raw_lat_lng=raw_lat_lng,
-        is_primary=1,
-    )
-
-    emergency_name = clean_string(get_val(row, mapping, "emergency_contact_name"))
-    emergency_phone = clean_string(get_val(row, mapping, "emergency_contact_phone"))
-    contact = None
-    if emergency_name or emergency_phone:
-        contact = CustomerContact(
-            contact_type="phone",
-            contact_role="emergency",
-            name=emergency_name,
-            phone_number=emergency_phone,
-            is_primary=0,
+    for field in UPLOAD_FIELD_DEFINITIONS:
+        if field["key"] not in normalized_mapping:
+            continue
+        raw_values_by_key[field["key"]] = get_val(row, normalized_mapping, field["key"])
+        values_by_target[field["target"]][field["attr"]] = parse_mapped_value(
+            row,
+            normalized_mapping,
+            field["key"],
         )
 
-    import_row = CustomerImportRow(
-        upload_batch=batch_code,
-        import_status="imported",
-        raw_customer_name=full_name,
-        raw_phone=primary_phone,
-        raw_address=full_address,
-        raw_city=city,
-        raw_due_date=stringify_value(get_val(row, mapping, "due_date")),
-        raw_outstanding_amount=stringify_value(get_val(row, mapping, "total_outstanding")),
-        raw_overdue_days=stringify_value(get_val(row, mapping, "overdue_days")),
-        raw_lat=str(parse_float(get_val(row, mapping, "lat"))) if parse_float(get_val(row, mapping, "lat")) is not None else None,
-        raw_lng=str(parse_float(get_val(row, mapping, "lng"))) if parse_float(get_val(row, mapping, "lng")) is not None else None,
-        raw_lat_lng=raw_lat_lng,
-        raw_platform_name=platform_name,
-        raw_payload=dict(row),
+    full_name = values_by_target["customer"].get("full_name")
+    nik = values_by_target["customer"].get("nik")
+    full_address = values_by_target["address"].get("full_address")
+    address_city = values_by_target["address"].get("city")
+    customer_platform_name = values_by_target["customer"].get("platform_name")
+    loan_platform_name = values_by_target["loan"].get("platform_name")
+
+    if not values_by_target["customer"].get("primary_address_summary"):
+        values_by_target["customer"]["primary_address_summary"] = full_address
+    if not values_by_target["customer"].get("primary_city"):
+        values_by_target["customer"]["primary_city"] = address_city
+    values_by_target["customer"]["status"] = values_by_target["customer"].get("status") or "new"
+    values_by_target["customer"]["upload_batch"] = batch_code
+    values_by_target["customer"]["search_name"] = normalize_text(full_name)
+    values_by_target["customer"]["search_nik"] = normalize_text(nik)
+    if values_by_target["customer"].get("current_dpd") is None:
+        values_by_target["customer"]["current_dpd"] = values_by_target["loan"].get("overdue_days")
+    if values_by_target["customer"].get("current_total_outstanding") is None:
+        values_by_target["customer"]["current_total_outstanding"] = values_by_target["loan"].get("total_outstanding")
+    if values_by_target["customer"].get("last_payment_date") is None:
+        values_by_target["customer"]["last_payment_date"] = values_by_target["loan"].get("last_payment_date")
+    if values_by_target["customer"].get("last_payment_amount") is None:
+        values_by_target["customer"]["last_payment_amount"] = values_by_target["loan"].get("last_payment_amount")
+
+    if values_by_target["loan"].get("is_current") is None:
+        values_by_target["loan"]["is_current"] = 1
+    if not values_by_target["loan"].get("platform_name"):
+        values_by_target["loan"]["platform_name"] = customer_platform_name
+
+    values_by_target["address"]["address_type"] = values_by_target["address"].get("address_type") or "home"
+    values_by_target["address"]["full_address"] = (
+        full_address
+        or values_by_target["customer"].get("primary_address_summary")
+        or "-"
     )
+    if values_by_target["address"].get("is_primary") is None:
+        values_by_target["address"]["is_primary"] = 1
+    if values_by_target["address"].get("is_active") is None:
+        values_by_target["address"]["is_active"] = 1
+
+    contact_name = resolve_mapping_value(row, normalized_mapping, "contact_name", "emergency_contact_name")
+    contact_phone = resolve_mapping_value(
+        row,
+        normalized_mapping,
+        "contact_phone_number",
+        "emergency_contact_phone",
+    )
+    if contact_name is not None:
+        values_by_target["contact"]["name"] = contact_name
+    if contact_phone is not None:
+        values_by_target["contact"]["phone_number"] = contact_phone
+    values_by_target["contact"]["contact_type"] = values_by_target["contact"].get("contact_type") or "phone"
+    values_by_target["contact"]["contact_role"] = values_by_target["contact"].get("contact_role") or "emergency"
+    if values_by_target["contact"].get("is_primary") is None:
+        values_by_target["contact"]["is_primary"] = 0
+    if values_by_target["contact"].get("is_active") is None:
+        values_by_target["contact"]["is_active"] = 1
+    if values_by_target["contact"].get("is_valid") is None:
+        values_by_target["contact"]["is_valid"] = 1
+    if values_by_target["contact"].get("is_whatsapp") is None:
+        values_by_target["contact"]["is_whatsapp"] = 0
+    if values_by_target["contact"].get("is_verified") is None:
+        values_by_target["contact"]["is_verified"] = 0
+
+    values_by_target["import_row"]["upload_batch"] = batch_code
+    values_by_target["import_row"]["import_status"] = values_by_target["import_row"].get("import_status") or "imported"
+    if values_by_target["import_row"].get("import_error_flag") is None:
+        values_by_target["import_row"]["import_error_flag"] = 0
+    values_by_target["import_row"]["raw_payload"] = dict(row)
+    if not values_by_target["import_row"].get("raw_customer_name"):
+        values_by_target["import_row"]["raw_customer_name"] = stringify_value(raw_values_by_key.get("full_name")) or full_name
+    if not values_by_target["import_row"].get("raw_nik"):
+        values_by_target["import_row"]["raw_nik"] = stringify_value(raw_values_by_key.get("nik")) or nik
+    if not values_by_target["import_row"].get("raw_phone"):
+        values_by_target["import_row"]["raw_phone"] = stringify_value(raw_values_by_key.get("primary_phone")) or values_by_target["customer"].get("primary_phone")
+    if not values_by_target["import_row"].get("raw_address"):
+        values_by_target["import_row"]["raw_address"] = stringify_value(raw_values_by_key.get("full_address")) or full_address
+    if not values_by_target["import_row"].get("raw_city"):
+        values_by_target["import_row"]["raw_city"] = stringify_value(raw_values_by_key.get("city")) or address_city or values_by_target["customer"].get("primary_city")
+    if not values_by_target["import_row"].get("raw_due_date"):
+        values_by_target["import_row"]["raw_due_date"] = stringify_value(raw_values_by_key.get("due_date"))
+    if not values_by_target["import_row"].get("raw_disbursement_date"):
+        values_by_target["import_row"]["raw_disbursement_date"] = stringify_value(raw_values_by_key.get("disbursement_date"))
+    if not values_by_target["import_row"].get("raw_loan_amount"):
+        values_by_target["import_row"]["raw_loan_amount"] = stringify_value(raw_values_by_key.get("loan_amount"))
+    if not values_by_target["import_row"].get("raw_installment_amount"):
+        values_by_target["import_row"]["raw_installment_amount"] = stringify_value(raw_values_by_key.get("installment_amount"))
+    if not values_by_target["import_row"].get("raw_outstanding_amount"):
+        values_by_target["import_row"]["raw_outstanding_amount"] = stringify_value(raw_values_by_key.get("total_outstanding"))
+    if not values_by_target["import_row"].get("raw_overdue_days"):
+        values_by_target["import_row"]["raw_overdue_days"] = stringify_value(raw_values_by_key.get("overdue_days"))
+    if not values_by_target["import_row"].get("raw_lat"):
+        values_by_target["import_row"]["raw_lat"] = stringify_value(raw_values_by_key.get("lat")) or stringify_value(values_by_target["address"].get("lat"))
+    if not values_by_target["import_row"].get("raw_lng"):
+        values_by_target["import_row"]["raw_lng"] = stringify_value(raw_values_by_key.get("lng")) or stringify_value(values_by_target["address"].get("lng"))
+    if not values_by_target["import_row"].get("raw_lat_lng"):
+        values_by_target["import_row"]["raw_lat_lng"] = stringify_value(raw_values_by_key.get("raw_lat_lng")) or values_by_target["address"].get("raw_lat_lng")
+    if not values_by_target["import_row"].get("raw_platform_name"):
+        values_by_target["import_row"]["raw_platform_name"] = stringify_value(raw_values_by_key.get("platform_name")) or customer_platform_name or loan_platform_name
+    if not values_by_target["import_row"].get("raw_status"):
+        values_by_target["import_row"]["raw_status"] = stringify_value(raw_values_by_key.get("status")) or values_by_target["customer"].get("status")
+
+    customer = Customer(**values_by_target["customer"])
+    loan = CustomerLoan(**values_by_target["loan"])
+    address = CustomerAddress(**values_by_target["address"])
+
+    contact = None
+    if any(
+        values_by_target["contact"].get(field_name) is not None
+        for field_name in ("name", "phone_number", "email", "relationship_label")
+    ):
+        contact = CustomerContact(**values_by_target["contact"])
+
+    import_row = CustomerImportRow(**values_by_target["import_row"])
 
     return CustomerImportPayload(
         customer=customer,
@@ -356,23 +654,8 @@ async def upload_customers(
         with open(temp_filepath, "wb") as f:
             f.write(contents)
 
-        # Define the expected database fields for mapping
-        expected_fields = [
-            {"key": "full_name", "label": "Nama (Wajib)", "required": True},
-            {"key": "primary_phone", "label": "No. HP Utama", "required": False},
-            {"key": "full_address", "label": "Alamat Utama", "required": False},
-            {"key": "city", "label": "Kota", "required": False},
-            {"key": "loan_number", "label": "Nomor Kontrak / Loan Number", "required": False},
-            {"key": "platform_name", "label": "Platform / Aplikasi", "required": False},
-            {"key": "total_outstanding", "label": "Outstanding Amount", "required": False},
-            {"key": "overdue_days", "label": "Overdue (DPD)", "required": False},
-            {"key": "due_date", "label": "Tanggal Jatuh Tempo", "required": False},
-            {"key": "raw_lat_lng", "label": "Latitude & Longitude Gabungan", "required": False},
-            {"key": "lat", "label": "Latitude (GPS)", "required": False},
-            {"key": "lng", "label": "Longitude (GPS)", "required": False},
-            {"key": "emergency_contact_name", "label": "Emergency Contact Name", "required": False},
-            {"key": "emergency_contact_phone", "label": "Emergency Contact Phone", "required": False},
-        ]
+        expected_fields = UPLOAD_FIELD_DEFINITIONS
+        category_groups = build_category_groups()
 
         return templates.TemplateResponse(
             request,
@@ -381,6 +664,7 @@ async def upload_customers(
                 "current_user": current_user,
                 "headers": headers,
                 "expected_fields": expected_fields,
+                "category_groups": category_groups,
                 "temp_filename": temp_filename,
                 "agent_id": agent_id or "",
             },

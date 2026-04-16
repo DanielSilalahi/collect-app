@@ -54,6 +54,22 @@
         background: rgba(13, 110, 253, 0.03);
     }
 
+    .mapping-category {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 1rem;
+        overflow: hidden;
+    }
+
+    .mapping-category + .mapping-category {
+        margin-top: 1rem;
+    }
+
+    .mapping-category-head {
+        background: linear-gradient(180deg, rgba(13, 110, 253, 0.08) 0%, rgba(13, 110, 253, 0.02) 100%);
+        padding: 0.9rem 1rem;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
     @media (max-width: 991.98px) {
         .mapping-grid {
             grid-template-columns: 1fr;
@@ -68,8 +84,8 @@
         <div class="row align-items-center g-4">
             <div class="col-lg-7">
                 <div class="small text-uppercase fw-semibold muted mb-2">Langkah 2 dari 2</div>
-                <h2 class="fw-bold mb-3">Cocokkan header Excel ke field customer semi-normalized sebelum import dimulai.</h2>
-                <p class="muted mb-0">Setiap pilihan di bawah menentukan apakah nilai masuk ke snapshot customer, data pinjaman aktif, alamat utama, kontak darurat, atau raw import row untuk audit.</p>
+                <h2 class="fw-bold mb-3">Cocokkan header Excel ke semua field bisnis customer semi-normalized sebelum import dimulai.</h2>
+                <p class="muted mb-0">Setiap pilihan di bawah menentukan apakah nilai masuk ke snapshot customer, alamat, pinjaman aktif, kontak tambahan, atau metadata raw import untuk audit. Field sistem internal sengaja tidak ditampilkan.</p>
             </div>
             <div class="col-lg-5">
                 <div class="mapping-tags">
@@ -88,40 +104,53 @@
         <div class="mapping-panel p-3 p-lg-4">
             <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
                 <div>
-                    <h5 class="mb-1 fw-bold"><i class="bi bi-diagram-3 me-2 text-primary"></i>Field Mapping</h5>
-                    <div class="small text-muted">Sistem mendeteksi <strong>{{ headers|length }} kolom</strong>. Pilih header Excel yang paling sesuai untuk setiap field tujuan.</div>
+                    <h5 class="mb-1 fw-bold"><i class="bi bi-diagram-3 me-2 text-primary"></i>Field Mapping per Kategori</h5>
+                    <div class="small text-muted">Sistem mendeteksi <strong>{{ headers|length }} kolom</strong>. Semua field bisnis yang bisa di-import ditampilkan dan dibagi per kategori supaya user bisa menyesuaikan sendiri dengan format partner.</div>
                 </div>
                 <div class="small text-muted"><span class="text-danger fw-semibold">*</span> wajib dipilih</div>
             </div>
 
-            <div class="table-responsive">
-                <table class="table table-sm align-middle mapping-table">
-                    <thead class="table-light">
-                        <tr>
-                            <th width="46%">Field tujuan</th>
-                            <th width="54%">Header Excel</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for field in expected_fields %}
-                        <tr>
-                            <td>
-                                <div class="fw-semibold text-dark">{{ field.label }}</div>
-                                <div class="small text-muted">{{ field.key }}</div>
-                            </td>
-                            <td>
-                                <select class="form-select form-select-sm" name="mapped_{{ field.key }}" {% if field.required %}required{% endif %}>
-                                    <option value="">-- Abaikan field ini --</option>
-                                    {% for header in headers %}
-                                    <option value="{{ loop.index0 }}">{{ header }}</option>
-                                    {% endfor %}
-                                </select>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+            {% for group in category_groups %}
+            <section class="mapping-category">
+                <div class="mapping-category-head">
+                    <div class="d-flex justify-content-between align-items-start gap-3">
+                        <div>
+                            <div class="fw-semibold text-dark"><i class="bi {{ group.icon }} me-2 text-primary"></i>{{ group.label }}</div>
+                            <div class="small text-muted mt-1">{{ group.description }}</div>
+                        </div>
+                        <span class="badge text-bg-light">{{ group.fields|length }} field</span>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mapping-table mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="46%">Field tujuan</th>
+                                <th width="54%">Header Excel</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for field in group.fields %}
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold text-dark">{{ field.label }}</div>
+                                    <div class="small text-muted">{{ field.key }}</div>
+                                </td>
+                                <td>
+                                    <select class="form-select form-select-sm" name="mapped_{{ field.key }}" {% if field.required %}required{% endif %}>
+                                        <option value="">-- Abaikan field ini --</option>
+                                        {% for header in headers %}
+                                        <option value="{{ loop.index0 }}">{{ header }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            {% endfor %}
 
             <div class="d-flex justify-content-between mt-4 border-top pt-3">
                 <a href="/customers" class="btn btn-outline-secondary px-4">Batal</a>
@@ -134,14 +163,14 @@
         <div class="mapping-panel p-3 p-lg-4">
             <div class="small text-uppercase fw-semibold text-primary mb-2">Panduan Cepat</div>
             <h5 class="fw-bold mb-3">Cara memilih mapping yang aman</h5>
-            <div class="small text-muted mb-3">Pilih hanya kolom yang benar-benar tersedia di file partner. Field yang tidak dipilih akan dilewati, bukan menyebabkan import gagal.</div>
+                <div class="small text-muted mb-3">Pilih hanya kolom yang benar-benar tersedia di file partner. Field yang tidak dipilih akan dilewati, bukan menyebabkan import gagal.</div>
 
             <div class="border rounded-4 p-3 mb-3 bg-light-subtle">
                 <div class="fw-semibold mb-2">Prioritas minimal</div>
                 <ul class="small text-muted mb-0 ps-3">
                     <li>`full_name` wajib untuk membuat customer</li>
                     <li>`primary_phone` membantu dashboard dan follow-up</li>
-                    <li>`loan_number`, `total_outstanding`, dan `overdue_days` mengisi snapshot pinjaman</li>
+                    <li>`loan_number`, `total_outstanding`, dan `overdue_days` membantu mengisi snapshot pinjaman aktif</li>
                 </ul>
             </div>
 
@@ -151,8 +180,8 @@
             </div>
 
             <div class="border rounded-4 p-3">
-                <div class="fw-semibold mb-2">Kontak darurat</div>
-                <div class="small text-muted">Gunakan `emergency_contact_name` dan `emergency_contact_phone` bila file partner punya nomor penanggung jawab lain selain nomor utama nasabah.</div>
+                <div class="fw-semibold mb-2">Kontak tambahan</div>
+                <div class="small text-muted">Gunakan field kategori kontak seperti `contact_name`, `contact_phone_number`, `relationship_label`, atau `contact_role` bila file partner punya PIC tambahan selain nomor utama nasabah.</div>
             </div>
         </div>
     </form>
