@@ -7,6 +7,7 @@ from core.database import Base
 from models import activity_log, collection, customer_address, customer_contact, customer_import_row, customer_loan, user, va_data, va_request  # noqa: F401
 from models.customer import Customer
 from models.customer_loan import CustomerLoan
+from schemas.customer import CustomerResponse
 
 
 def test_customer_model_has_snapshot_columns():
@@ -54,3 +55,19 @@ def test_customer_can_hold_current_loan_snapshot():
         assert loaded_customer.current_dpd == 12
     finally:
         session.close()
+
+
+def test_customer_response_uses_snapshot_fields():
+    payload = CustomerResponse.model_validate(
+        Customer(
+            id=1,
+            full_name="Budi",
+            primary_phone="08123",
+            status="active",
+            current_dpd=5,
+        )
+    )
+
+    assert payload.full_name == "Budi"
+    assert payload.primary_phone == "08123"
+    assert payload.current_dpd == 5
