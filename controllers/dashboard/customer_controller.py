@@ -370,7 +370,12 @@ def serialize_model_for_runtime_insert(model_instance, target, runtime_columns_b
             continue
         if column_name == "id":
             continue
-        values[column_name] = getattr(model_instance, attr)
+        value = getattr(model_instance, attr)
+        if column_name == "created_at" and value is None:
+            value = datetime.now()
+        if value is None and column_name in {"created_at", "updated_at"}:
+            continue
+        values[column_name] = value
 
     if target == "customer":
         if "name" in runtime_columns and not values.get("name"):
@@ -390,6 +395,16 @@ def serialize_model_for_runtime_insert(model_instance, target, runtime_columns_b
         if "is_deleted" in runtime_columns and values.get("is_deleted") is None:
             values["is_deleted"] = 0
     return values
+
+
+def get_runtime_customer_load_attrs(runtime_columns_by_target):
+    runtime_columns = runtime_columns_by_target.get("customer", set())
+    attrs = []
+    for attr in Customer.__mapper__.column_attrs:
+        column = attr.columns[0] if attr.columns else None
+        if column is not None and column.name in runtime_columns:
+            attrs.append(getattr(Customer, attr.key))
+    return attrs
 
 
 def build_category_groups(field_definitions=None):
@@ -666,9 +681,12 @@ def customer_batch_detail(
         return RedirectResponse("/login", status_code=302)
 
     per_page = 20
-    from sqlalchemy.orm import joinedload, selectinload
+    from sqlalchemy.orm import joinedload, load_only, selectinload
     from models.collection import Collection
+    runtime_columns_by_target = get_runtime_columns_by_target(db)
+    customer_load_attrs = get_runtime_customer_load_attrs(runtime_columns_by_target)
     query = db.query(Customer).options(
+        load_only(*customer_load_attrs),
         joinedload(Customer.agent),
         joinedload(Customer.current_loan),
         selectinload(Customer.addresses),

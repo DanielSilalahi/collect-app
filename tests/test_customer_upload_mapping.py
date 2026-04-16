@@ -1,6 +1,7 @@
 from controllers.dashboard.customer_controller import (
     build_customer_import_payload,
     filter_field_definitions_by_runtime_columns,
+    get_runtime_customer_load_attrs,
     serialize_model_for_runtime_insert,
 )
 
@@ -132,3 +133,44 @@ def test_runtime_insert_serializer_backfills_required_legacy_customer_columns():
     assert serialized["address"] == "Bukit Senang"
     assert serialized["phone"] == "82386031271"
     assert serialized["is_deleted"] == 0
+
+
+def test_runtime_insert_serializer_sets_created_at_when_column_exists():
+    result = build_customer_import_payload(
+        row={"Nama": "Siti Aminah"},
+        mapping={"full_name": "Nama"},
+        batch_code="UPLOAD_20260416_100000",
+    )
+
+    runtime_columns_by_target = {
+        "customer": {"full_name", "status", "upload_batch", "search_name", "created_at"},
+        "address": set(),
+        "loan": set(),
+        "contact": set(),
+        "import_row": set(),
+    }
+
+    serialized = serialize_model_for_runtime_insert(
+        result.customer,
+        "customer",
+        runtime_columns_by_target,
+    )
+
+    assert serialized["created_at"] is not None
+
+
+def test_runtime_customer_load_attrs_hide_missing_columns():
+    attrs = get_runtime_customer_load_attrs(
+        {
+            "customer": {"id", "full_name", "primary_phone", "status", "upload_batch"},
+            "address": set(),
+            "loan": set(),
+            "contact": set(),
+            "import_row": set(),
+        }
+    )
+
+    attr_keys = {attr.key for attr in attrs}
+
+    assert "full_name" in attr_keys
+    assert "partner_name" not in attr_keys
