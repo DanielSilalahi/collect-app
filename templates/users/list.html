@@ -12,11 +12,11 @@
     </div>
 </div>
 
-<div class="card bg-white border-0 shadow-sm rounded-4">
+<div class="table-card animate-in">
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
+                <thead>
                     <tr>
                         <th class="ps-4">No</th>
                         <th>Nama</th>
@@ -29,22 +29,22 @@
                 <tbody>
                     {% for u in users %}
                     <tr>
-                        <td class="ps-4 text-muted">{{ loop.index }}</td>
-                        <td class="fw-medium">{{ u.name }}</td>
-                        <td>{{ u.username }}</td>
+                        <td class="ps-4" style="color: var(--text-muted);">{{ loop.index }}</td>
+                        <td class="fw-medium" style="color: var(--text-heading);">{{ u.name }}</td>
+                        <td style="color: var(--text-secondary);">{{ u.username }}</td>
                         <td>
                             {% if u.role == 'admin' %}
-                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle px-2 py-1 rounded-pill">Admin</span>
+                            <span class="badge" style="background: var(--accent-subtle); color: var(--accent); border: 1px solid rgba(99,102,241,0.2); border-radius: 999px; padding: 0.35rem 0.75rem;">Admin</span>
                             {% else %}
-                            <span class="badge bg-info bg-opacity-10 text-info border border-info-subtle px-2 py-1 rounded-pill">Agent</span>
+                            <span class="badge" style="background: var(--info-subtle); color: var(--info); border: 1px solid rgba(6,182,212,0.2); border-radius: 999px; padding: 0.35rem 0.75rem;">Agent</span>
                             {% endif %}
                         </td>
-                        <td class="text-muted">{{ u.phone or '-' }}</td>
+                        <td style="color: var(--text-muted);">{{ u.phone or '-' }}</td>
                         <td>
                             {% if u.is_active %}
-                            <span class="badge bg-success bg-opacity-10 text-success border border-success-subtle px-2 py-1 rounded-pill">Aktif</span>
+                            <span class="badge" style="background: var(--success-subtle); color: var(--success); border: 1px solid rgba(34,197,94,0.2); border-radius: 999px; padding: 0.35rem 0.75rem;">Aktif</span>
                             {% else %}
-                            <span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle px-2 py-1 rounded-pill">Nonaktif</span>
+                            <span class="badge" style="background: var(--danger-subtle); color: var(--danger); border: 1px solid rgba(239,68,68,0.2); border-radius: 999px; padding: 0.35rem 0.75rem;">Nonaktif</span>
                             {% endif %}
                         </td>
                     </tr>
@@ -65,8 +65,8 @@
 <!-- Modal Add User -->
 <div class="modal fade" id="addUserModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content rounded-4 border-0 shadow">
-            <div class="modal-header border-bottom-0 pb-0">
+        <div class="modal-content">
+            <div class="modal-header" style="border-bottom-color: var(--border-color);">
                 <h5 class="modal-title fw-bold">Tambah User/Agent Baru</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
@@ -96,7 +96,7 @@
                         </select>
                     </div>
                 </div>
-                <div class="modal-footer border-top-0 pt-0">
+                <div class="modal-footer">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
                     <button type="submit" class="btn btn-primary px-4">Simpan User</button>
                 </div>

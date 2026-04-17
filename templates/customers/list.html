@@ -12,11 +12,11 @@
         </a>
     </div>
     <div class="col">
-        <h5 class="mb-0 text-muted ms-2">Batch: {{ batch_code if batch_code != 'manual' else 'Input Manual / Tanpa Batch' }}</h5>
+        <h5 class="mb-0 ms-2" style="color: var(--text-secondary);">Batch: {{ batch_code if batch_code != 'manual' else 'Input Manual / Tanpa Batch' }}</h5>
     </div>
 </div>
 
-<div class="filter-bar">
+<div class="filter-bar animate-in">
     <form method="GET" action="" class="row g-2 align-items-end">
         <div class="col-md-3">
             <label class="form-label small fw-semibold">Cari Nama</label>
@@ -63,7 +63,7 @@
     </form>
 </div>
 
-<div class="table-card">
+<div class="table-card animate-in">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-people me-2"></i>Daftar Customer ({{ total }})</span>
     </div>
@@ -87,18 +87,18 @@
                 <tr>
                     <td><input type="checkbox" class="form-check-input row-checkbox" value="{{ c.id }}"></td>
                     <td>
-                        <div class="fw-semibold">{{ c.full_name }}</div>
+                        <div class="fw-semibold" style="color: var(--text-heading);">{{ c.full_name }}</div>
                         <div class="small text-muted">{{ c.primary_city or 'Kota belum tersedia' }}</div>
                     </td>
                     <td class="small text-muted" style="max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ c.primary_address_summary or '-' }}</td>
                     <td class="small">
-                        <div>{{ c.primary_phone or '-' }}</div>
+                        <div style="color: var(--text-primary);">{{ c.primary_phone or '-' }}</div>
                         <div class="text-muted">{{ emergency_contact.phone_number if emergency_contact and emergency_contact.phone_number else 'Tanpa kontak darurat' }}</div>
                     </td>
                     <td class="small">{{ c.agent.name if c.agent else '<span class="text-muted">Belum assign</span>' | safe }}</td>
                     <td class="small">
                         {% if c.current_loan %}
-                        <div class="fw-semibold">{{ c.current_loan.loan_number or '-' }}</div>
+                        <div class="fw-semibold" style="color: var(--text-heading);">{{ c.current_loan.loan_number or '-' }}</div>
                         <div class="text-muted">DPD {{ c.current_dpd if c.current_dpd != None else '-' }} • OS {{ ("Rp {:,}".format(c.current_total_outstanding|int)) if c.current_total_outstanding else '-' }}</div>
                         {% else %}
                         <span class="text-muted">Belum ada snapshot pinjaman</span>
@@ -128,7 +128,7 @@
     </div>
 
     {% if total_pages > 1 %}
-    <div class="p-3 border-top">
+    <div class="p-3" style="border-top: 1px solid var(--border-color);">
         <nav>
             <ul class="pagination pagination-sm justify-content-center mb-0">
                 <li class="page-item {% if page == 1 %}disabled{% endif %}">
@@ -165,102 +165,102 @@
             <div class="modal-body">
                 <div class="row">
                     <div class="col-md-6 mb-3">
-                        <label class="small text-muted fw-bold">Nama</label>
-                        <div>{{ c.full_name }}</div>
+                        <label class="small fw-bold" style="color: var(--text-muted);">Nama</label>
+                        <div style="color: var(--text-heading);">{{ c.full_name }}</div>
                     </div>
                     <div class="col-md-6 mb-3">
-                        <label class="small text-muted fw-bold">No. Telepon</label>
-                        <div>{{ c.primary_phone or '-' }}</div>
+                        <label class="small fw-bold" style="color: var(--text-muted);">No. Telepon</label>
+                        <div style="color: var(--text-heading);">{{ c.primary_phone or '-' }}</div>
                     </div>
                     <div class="col-md-12 mb-3">
-                        <label class="small text-muted fw-bold">Alamat</label>
-                        <div>{{ c.primary_address_summary or '-' }}</div>
+                        <label class="small fw-bold" style="color: var(--text-muted);">Alamat</label>
+                        <div style="color: var(--text-heading);">{{ c.primary_address_summary or '-' }}</div>
                     </div>
 
                     <div class="col-12"><hr class="my-2"></div>
 
                     <div class="col-md-6 mb-3">
-                        <label class="small text-muted fw-bold">Platform / Aplikasi</label>
-                        <div>{{ c.platform_name or '-' }}</div>
+                        <label class="small fw-bold" style="color: var(--text-muted);">Platform / Aplikasi</label>
+                        <div style="color: var(--text-heading);">{{ c.platform_name or '-' }}</div>
                     </div>
                     <div class="col-md-6 mb-3">
-                        <label class="small text-muted fw-bold">Nomor Pinjaman (Loan Number)</label>
-                        <div>{{ c.current_loan.loan_number if c.current_loan else '-' }}</div>
+                        <label class="small fw-bold" style="color: var(--text-muted);">Nomor Pinjaman (Loan Number)</label>
+                        <div style="color: var(--text-heading);">{{ c.current_loan.loan_number if c.current_loan else '-' }}</div>
                     </div>
                     <div class="col-md-4 mb-3">
-                        <label class="small text-muted fw-bold">Tagihan (Outstanding)</label>
-                        <div>{{ ("Rp {:,}".format(c.current_total_outstanding|int)) if c.current_total_outstanding else '-' }}</div>
+                        <label class="small fw-bold" style="color: var(--text-muted);">Tagihan (Outstanding)</label>
+                        <div style="color: var(--text-heading);">{{ ("Rp {:,}".format(c.current_total_outstanding|int)) if c.current_total_outstanding else '-' }}</div>
                     </div>
                     <div class="col-md-4 mb-3">
-                        <label class="small text-muted fw-bold">Overdue (Hari)</label>
-                        <div>{{ c.current_dpd if c.current_dpd != None else '-' }}</div>
+                        <label class="small fw-bold" style="color: var(--text-muted);">Overdue (Hari)</label>
+                        <div style="color: var(--text-heading);">{{ c.current_dpd if c.current_dpd != None else '-' }}</div>
                     </div>
                     <div class="col-md-4 mb-3">
-                        <label class="small text-muted fw-bold">Tanggal Jatuh Tempo</label>
-                        <div>{{ c.current_loan.due_date.strftime('%d/%m/%Y') if c.current_loan and c.current_loan.due_date else '-' }}</div>
+                        <label class="small fw-bold" style="color: var(--text-muted);">Tanggal Jatuh Tempo</label>
+                        <div style="color: var(--text-heading);">{{ c.current_loan.due_date.strftime('%d/%m/%Y') if c.current_loan and c.current_loan.due_date else '-' }}</div>
                     </div>
 
                     <div class="col-12"><hr class="my-2"></div>
 
                     <div class="col-md-6 mb-3">
-                        <label class="small text-muted fw-bold">Status Snapshot</label>
-                        <div>{{ c.status | replace('_', ' ') | title }}</div>
+                        <label class="small fw-bold" style="color: var(--text-muted);">Status Snapshot</label>
+                        <div style="color: var(--text-heading);">{{ c.status | replace('_', ' ') | title }}</div>
                         <div class="text-muted">{{ c.sub_status | replace('_', ' ') | title if c.sub_status else 'Tanpa sub status' }}</div>
                     </div>
                     <div class="col-md-6 mb-3">
-                        <label class="small text-muted fw-bold">Kontak Darurat</label>
+                        <label class="small fw-bold" style="color: var(--text-muted);">Kontak Darurat</label>
                         {% if emergency_contacts %}
                             {% for contact in emergency_contacts %}
                             <div class="{% if not loop.first %}mt-2{% endif %}">
-                                {{ contact.name or '-' }}<br>
+                                <span style="color: var(--text-heading);">{{ contact.name or '-' }}</span><br>
                                 <span class="text-muted">{{ contact.phone_number or '-' }}</span>
                             </div>
                             {% endfor %}
                         {% else %}
-                        <div>-</div>
+                        <div style="color: var(--text-heading);">-</div>
                         {% endif %}
                     </div>
 
                     <div class="col-12"><hr class="my-2"></div>
 
                     <div class="col-md-6 mb-3">
-                        <label class="small text-muted fw-bold">Koordinat GPS</label>
+                        <label class="small fw-bold" style="color: var(--text-muted);">Koordinat GPS</label>
                         <div>
                             {% if primary_address and primary_address.lat and primary_address.lng %}
                             <a href="https://www.google.com/maps/search/?api=1&query={{ primary_address.lat }},{{ primary_address.lng }}" target="_blank" class="text-decoration-none">
-                                <i class="bi bi-geo-alt-fill text-danger me-1"></i>{{ primary_address.lat }}, {{ primary_address.lng }}
+                                <i class="bi bi-geo-alt-fill me-1" style="color: var(--danger);"></i>{{ primary_address.lat }}, {{ primary_address.lng }}
                             </a>
                             {% elif primary_address and primary_address.raw_lat_lng %}
-                            <span>{{ primary_address.raw_lat_lng }}</span>
+                            <span style="color: var(--text-heading);">{{ primary_address.raw_lat_lng }}</span>
                             {% else %}
                             -
                             {% endif %}
                         </div>
                     </div>
                     <div class="col-md-6 mb-3">
-                        <label class="small text-muted fw-bold">Catatan Data Nasabah</label>
-                        <div>{{ c.notes or '-' }}</div>
+                        <label class="small fw-bold" style="color: var(--text-muted);">Catatan Data Nasabah</label>
+                        <div style="color: var(--text-heading);">{{ c.notes or '-' }}</div>
                     </div>
 
                     <div class="col-12 mt-3 mb-2">
-                        <h6 class="fw-bold text-primary mb-3"><i class="bi bi-journal-check me-2"></i>Histori Kunjungan Lapangan</h6>
+                        <h6 class="fw-bold mb-3" style="color: var(--accent);"><i class="bi bi-journal-check me-2"></i>Histori Kunjungan Lapangan</h6>
                         {% if c.collections %}
-                            <div class="border rounded bg-light" style="max-height: 400px; overflow-y: auto;">
+                            <div class="rounded-3" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); background: var(--bg-surface-2);">
                                 <div class="list-group list-group-flush">
                                     {% for col in c.collections|sort(attribute='timestamp', reverse=True) %}
-                                    <div class="list-group-item bg-transparent px-3 py-3 {% if not loop.last %}border-bottom{% endif %}">
+                                    <div class="list-group-item px-3 py-3 {% if not loop.last %}border-bottom{% endif %}" style="background: transparent; border-color: var(--border-color);">
                                         <div class="d-flex w-100 justify-content-between mb-1">
-                                            <h6 class="mb-0 fw-bold"><i class="bi bi-person-badge text-muted me-1"></i>{{ col.agent.name if col.agent else 'Unknown Agent' }}</h6>
-                                            <small class="text-muted"><i class="bi bi-clock_history me-1"></i>{{ col.timestamp.strftime('%d %b %Y, %H:%M') if col.timestamp else col.created_at.strftime('%d %b %Y') }}</small>
+                                            <h6 class="mb-0 fw-bold" style="color: var(--text-heading);"><i class="bi bi-person-badge me-1" style="color: var(--text-muted);"></i>{{ col.agent.name if col.agent else 'Unknown Agent' }}</h6>
+                                            <small class="text-muted"><i class="bi bi-clock me-1"></i>{{ col.timestamp.strftime('%d %b %Y, %H:%M') if col.timestamp else col.created_at.strftime('%d %b %Y') }}</small>
                                         </div>
                                         <div class="mb-2 mt-2">
-                                            <span class="badge badge-{{ col.status }} bg-opacity-75">{{ col.status | replace('_', ' ') | title }}</span>
+                                            <span class="badge badge-{{ col.status }}">{{ col.status | replace('_', ' ') | title }}</span>
                                         </div>
-                                        <p class="mb-2 small"><strong>Laporan/Keterangan:</strong><br>{{ col.notes or '-' }}</p>
+                                        <p class="mb-2 small" style="color: var(--text-secondary);"><strong>Laporan/Keterangan:</strong><br>{{ col.notes or '-' }}</p>
                                         {% if col.photo_url %}
                                         <div class="mt-2 mb-2">
                                             <a href="{{ col.photo_url }}" target="_blank">
-                                                <img src="{{ col.photo_url }}" alt="Bukti Kunjungan" class="img-thumbnail shadow-sm rounded" style="max-height: 125px; object-fit: cover;">
+                                                <img src="{{ col.photo_url }}" alt="Bukti Kunjungan" class="rounded" style="max-height: 125px; object-fit: cover; border: 1px solid var(--border-color);">
                                             </a>
                                             <div class="small text-muted mt-1" style="font-size: 0.70rem;">Klik foto untuk memperbesar</div>
                                         </div>
@@ -268,7 +268,7 @@
                                         <div class="mt-2">
                                             {% if col.gps_lat and col.gps_lng %}
                                             <a href="https://www.google.com/maps/search/?api=1&query={{ col.gps_lat }},{{ col.gps_lng }}" target="_blank" class="small text-decoration-none">
-                                                <i class="bi bi-geo-alt-fill text-danger me-1"></i>Buka Peta Lokasi Kunjungan
+                                                <i class="bi bi-geo-alt-fill me-1" style="color: var(--danger);"></i>Buka Peta Lokasi Kunjungan
                                             </a>
                                             {% else %}
                                             <span class="small text-muted"><i class="bi bi-geo me-1"></i>Lokasi GPS tidak tercatat</span>
@@ -279,7 +279,7 @@
                                 </div>
                             </div>
                         {% else %}
-                            <div class="alert alert-light border small text-center text-muted mb-0 mt-2">
+                            <div class="small text-center text-muted p-3 rounded-3" style="background: var(--bg-surface-2); border: 1px solid var(--border-color);">
                                 <i class="bi bi-inbox me-1"></i> Belum ada histori kunjungan lapangan (Visit) untuk nasabah ini.
                             </div>
                         {% endif %}

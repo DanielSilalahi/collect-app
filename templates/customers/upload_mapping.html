@@ -12,7 +12,7 @@
     }
 
     .mapping-hero {
-        background: linear-gradient(135deg, #082b66 0%, #1259c3 52%, #79b8ff 100%);
+        background: linear-gradient(135deg, #1E1B4B 0%, #3730A3 52%, #6366F1 100%);
         border-radius: 1.5rem;
         color: #fff;
         overflow: hidden;
@@ -30,11 +30,12 @@
 
     .mapping-tags span {
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.14);
-        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.15);
         padding: 0.45rem 0.8rem;
         font-size: 0.8rem;
         line-height: 1;
+        backdrop-filter: blur(4px);
     }
 
     .mapping-grid {
@@ -45,26 +46,34 @@
     }
 
     .mapping-panel {
-        border: 1px solid rgba(15, 23, 42, 0.08);
+        border: 1px solid var(--border-color);
         border-radius: 1.25rem;
-        background: #fff;
-        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+        background: var(--bg-surface);
+        box-shadow: var(--card-shadow);
     }
     
     .sticky-footer {
         position: sticky;
         bottom: 0;
-        background: white;
+        background: var(--bg-surface);
         z-index: 1000;
         padding-top: 1rem;
         padding-bottom: 1rem;
-        border-top: 1px solid rgba(0,0,0,0.05);
+        border-top: 1px solid var(--border-color);
         margin-top: 2rem;
         grid-column: 1 / -1;
     }
 
     .text-muted-extra {
-        color: #94a3b8;
+        color: var(--text-muted);
+    }
+
+    .mapping-table th {
+        background: var(--bg-surface-2) !important;
+    }
+
+    .mapping-table td {
+        color: var(--text-primary);
     }
 
     @media (max-width: 991.98px) {
@@ -77,10 +86,10 @@
 
 {% block content %}
 <div class="mapping-shell">
-    <div class="mapping-hero p-4 p-lg-5 mb-2">
+    <div class="mapping-hero p-4 p-lg-5 mb-2 animate-in">
         <div class="row align-items-center g-4">
             <div class="col-lg-7">
-                <div class="small text-uppercase fw-semibold muted mb-2">Langkah 2 dari 2</div>
+                <div class="small text-uppercase fw-semibold muted mb-2" style="letter-spacing: 0.08em;">Langkah 2 dari 2</div>
                 <h2 class="fw-bold mb-3">Field Mapping Bisnis</h2>
                 <p class="muted mb-0">Cocokkan kolom Excel partner ke dalam sistem. Gunakan kolom kiri untuk data utama dan kolom kanan untuk detail tambahan.</p>
             </div>
@@ -100,17 +109,17 @@
 
         <div class="mapping-grid">
             <!-- LEFT COLUMN: Identity (Static Card) -->
-            <div class="mapping-panel p-4">
+            <div class="mapping-panel p-4 animate-in">
                 {% for group in category_groups if group.key == 'identity' %}
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h5 class="mb-0 fw-bold text-primary"><i class="bi {{ group.icon }} me-2"></i>{{ group.label }}</h5>
-                    <span class="badge rounded-pill text-bg-primary">{{ group.fields|length }} field</span>
+                    <h5 class="mb-0 fw-bold" style="color: var(--accent);"><i class="bi {{ group.icon }} me-2"></i>{{ group.label }}</h5>
+                    <span class="badge rounded-pill" style="background: var(--accent); color: #fff;">{{ group.fields|length }} field</span>
                 </div>
                 <p class="small text-muted mb-4">{{ group.description }}</p>
 
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mapping-table mb-0">
-                        <thead class="table-light">
+                        <thead>
                             <tr>
                                 <th width="45%" class="small fw-bold text-uppercase">Field Utama</th>
                                 <th width="55%" class="small fw-bold text-uppercase">Excel Header</th>
@@ -120,19 +129,19 @@
                             {% for field in group.fields %}
                             <tr>
                                 <td class="py-2">
-                                    <div class="fw-semibold text-dark" style="font-size: 0.9rem;">{{ field.label }} {% if field.required %}<span class="text-danger">*</span>{% endif %}</div>
+                                    <div class="fw-semibold" style="font-size: 0.9rem; color: var(--text-heading);">{{ field.label }} {% if field.required %}<span style="color: var(--danger);">*</span>{% endif %}</div>
                                     <div class="small text-muted-extra mt-0.5" style="font-size: 0.75rem;">Contoh: {{ field.example }}</div>
                                 </td>
                                 <td>
                                     {% set suggested_idx = suggested_mappings.get(field.key) %}
-                                    <select class="form-select form-select-sm border-secondary-subtle" name="mapped_{{ field.key }}" {% if field.required %}required{% endif %}>
+                                    <select class="form-select form-select-sm" name="mapped_{{ field.key }}" {% if field.required %}required{% endif %}>
                                         <option value="">- Abaikan -</option>
                                         {% for header in headers %}
                                         <option value="{{ loop.index0 }}" {% if suggested_idx == loop.index0 %}selected{% endif %}>{{ header }}</option>
                                         {% endfor %}
                                     </select>
                                     {% if suggested_idx is not none %}
-                                    <div class="small text-success mt-1 fw-semibold"><i class="bi bi-magic me-1"></i>Auto</div>
+                                    <div class="small mt-1 fw-semibold" style="color: var(--success);"><i class="bi bi-magic me-1"></i>Auto</div>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -146,7 +155,7 @@
             <!-- RIGHT COLUMN: Other Categories (Accordion) -->
             <div>
                 <div class="mb-3 ps-2">
-                    <h6 class="fw-bold text-secondary text-uppercase small"><i class="bi bi-plus-circle me-2"></i>Detail Tambahan (Opsional)</h6>
+                    <h6 class="fw-bold text-uppercase small" style="color: var(--text-muted);"><i class="bi bi-plus-circle me-2"></i>Detail Tambahan (Opsional)</h6>
                 </div>
                 <div class="accordion border-0" id="mappingAccordion">
                     {% for group in category_groups if group.key != 'identity' %}
@@ -155,17 +164,17 @@
                             <button class="accordion-button collapsed px-4 py-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ group.key }}" aria-expanded="false" aria-controls="collapse{{ group.key }}">
                                 <div class="d-flex align-items-center w-100">
                                     <div class="flex-grow-1">
-                                        <div class="fw-bold text-dark"><i class="bi {{ group.icon }} me-2 text-primary"></i>{{ group.label }}</div>
+                                        <div class="fw-bold" style="color: var(--text-heading);"><i class="bi {{ group.icon }} me-2" style="color: var(--accent);"></i>{{ group.label }}</div>
                                         <div class="small text-muted mt-1 fw-normal">{{ group.fields|length }} field tersedia</div>
                                     </div>
                                 </div>
                             </button>
                         </h2>
                         <div id="collapse{{ group.key }}" class="accordion-collapse collapse" data-bs-parent="#mappingAccordion">
-                            <div class="accordion-body p-0 border-top">
+                            <div class="accordion-body p-0" style="border-top: 1px solid var(--border-color);">
                                 <div class="table-responsive">
                                     <table class="table table-hover align-middle mapping-table mb-0">
-                                        <thead class="table-light">
+                                        <thead>
                                             <tr>
                                                 <th width="45%" class="ps-4 small fw-bold text-uppercase">Field</th>
                                                 <th width="55%" class="pe-4 small fw-bold text-uppercase">Excel Header</th>
@@ -175,19 +184,19 @@
                                             {% for field in group.fields %}
                                             <tr>
                                                 <td class="ps-4 py-2">
-                                                    <div class="fw-semibold text-dark" style="font-size: 0.9rem;">{{ field.label }} {% if field.required %}<span class="text-danger">*</span>{% endif %}</div>
+                                                    <div class="fw-semibold" style="font-size: 0.9rem; color: var(--text-heading);">{{ field.label }} {% if field.required %}<span style="color: var(--danger);">*</span>{% endif %}</div>
                                                     <div class="small text-muted-extra mt-0.5" style="font-size: 0.75rem;">Contoh: {{ field.example }}</div>
                                                 </td>
                                                 <td class="pe-4 py-3">
                                                     {% set suggested_idx = suggested_mappings.get(field.key) %}
-                                                    <select class="form-select form-select-sm border-secondary-subtle" name="mapped_{{ field.key }}" {% if field.required %}required{% endif %}>
+                                                    <select class="form-select form-select-sm" name="mapped_{{ field.key }}" {% if field.required %}required{% endif %}>
                                                         <option value="">- Abaikan -</option>
                                                         {% for header in headers %}
                                                         <option value="{{ loop.index0 }}" {% if suggested_idx == loop.index0 %}selected{% endif %}>{{ header }}</option>
                                                         {% endfor %}
                                                     </select>
                                                     {% if suggested_idx is not none %}
-                                                    <div class="small text-success mt-1 fw-semibold"><i class="bi bi-magic me-1"></i>Auto</div>
+                                                    <div class="small mt-1 fw-semibold" style="color: var(--success);"><i class="bi bi-magic me-1"></i>Auto</div>
                                                     {% endif %}
                                                 </td>
                                             </tr>
@@ -205,7 +214,7 @@
             <!-- STICKY FOOTER -->
             <div class="sticky-footer px-4 d-flex justify-content-between align-items-center">
                 <a href="/customers" class="btn btn-outline-secondary px-4">Batal & Kembali</a>
-                <button type="submit" class="btn btn-primary btn-lg px-5 shadow-sm fw-bold" onclick="if(this.form.checkValidity()) setLoading(true, 'Sedang memproses & mengimpor data...', 'Membatalkan proses impor...')">
+                <button type="submit" class="btn btn-primary btn-lg px-5 fw-bold" onclick="if(this.form.checkValidity()) setLoading(true, 'Sedang memproses & mengimpor data...', 'Membatalkan proses impor...')">
                     <i class="bi bi-cloud-upload-fill me-2"></i>Lanjutkan & Import Data
                 </button>
             </div>

@@ -8,32 +8,44 @@
 <style>
     .settings-card {
         border-radius: 1.25rem;
-        border: 1px solid rgba(15, 23, 42, 0.08);
-        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
-        background: #fff;
+        border: 1px solid var(--border-color);
+        box-shadow: var(--card-shadow);
+        background: var(--bg-surface);
     }
     .field-row {
         transition: all 0.2s;
-        border-bottom: 1px solid rgba(0,0,0,0.03);
+        border-bottom: 1px solid var(--border-subtle);
     }
     .field-row:hover {
-        background: rgba(13, 110, 253, 0.02);
-    }
-    .field-row.priority-active {
-        background: rgba(13, 110, 253, 0.05);
+        background: var(--table-hover);
     }
     .search-box {
         border-radius: 999px;
         padding-left: 2.5rem;
+        background: var(--bg-input);
+        border-color: var(--border-color);
+        color: var(--text-primary);
     }
-    .form-check-input:checked {
-        background-color: #0d6efd;
-        border-color: #0d6efd;
+    .search-box:focus {
+        background: var(--bg-input);
+        color: var(--text-primary);
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    .search-box::placeholder {
+        color: var(--text-muted);
     }
     .sticky-actions {
         position: sticky;
         bottom: 1.5rem;
         z-index: 100;
+    }
+    .sticky-actions .action-bar {
+        background: var(--bg-surface);
+        padding: 1rem 1.5rem;
+        border-radius: 1rem;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+        border: 1px solid var(--accent-subtle);
     }
 </style>
 {% endblock %}
@@ -41,11 +53,11 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-lg-10">
-        <div class="settings-card p-4">
+        <div class="settings-card p-4 animate-in">
             <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
                 <div>
-                    <h5 class="fw-bold mb-1"><i class="bi bi-ui-checks me-2 text-primary"></i>Daftar Field Bisnis</h5>
-                    <p class="text-muted small mb-0">Pilih field mana yang akan dianggap sebagai <strong>Kolom Utama (Identitas)</strong> dan tentukan kategorinya.</p>
+                    <h5 class="fw-bold mb-1" style="color: var(--text-heading);"><i class="bi bi-ui-checks me-2" style="color: var(--accent);"></i>Daftar Field Bisnis</h5>
+                    <p class="small mb-0" style="color: var(--text-secondary);">Pilih field mana yang akan dianggap sebagai <strong>Kolom Utama (Identitas)</strong> dan tentukan kategorinya.</p>
                 </div>
                 <div class="d-flex gap-2">
                     <a href="/settings/excel/categories" class="btn btn-outline-primary btn-sm rounded-pill px-3">
@@ -53,7 +65,7 @@
                     </a>
                 </div>
                 <div class="position-relative">
-                    <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                    <i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3" style="color: var(--text-muted);"></i>
                     <input type="text" id="fieldSearch" class="form-control search-box" placeholder="Cari field (misal: Nama, Alamat)..." style="min-width: 300px;">
                 </div>
             </div>
@@ -61,7 +73,7 @@
             <form action="/settings/excel/save" method="POST" id="settingsForm">
                 <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
                     <table class="table align-middle">
-                        <thead class="table-light sticky-top">
+                        <thead class="sticky-top" style="background: var(--bg-surface-2); z-index: 10;">
                             <tr>
                                 <th>Field Bisnis</th>
                                 <th width="250">Penugasan Kategori</th>
@@ -72,11 +84,11 @@
                             {% for field in fields %}
                             <tr class="field-row">
                                 <td>
-                                    <label class="fw-semibold text-dark d-block cursor-pointer" for="cat_select_{{ field.key }}">{{ field.label }}</label>
-                                    <div class="small text-muted">Contoh: {{ field.example }}</div>
+                                    <label class="fw-semibold d-block cursor-pointer" style="color: var(--text-heading);" for="cat_select_{{ field.key }}">{{ field.label }}</label>
+                                    <div class="small" style="color: var(--text-muted);">Contoh: {{ field.example }}</div>
                                 </td>
                                 <td>
-                                    <select name="category_{{ field.key }}" id="cat_select_{{ field.key }}" class="form-select form-select-sm border-0 bg-light category-select">
+                                    <select name="category_{{ field.key }}" id="cat_select_{{ field.key }}" class="form-select form-select-sm category-select">
                                         <option value="">-- Tanpa Kategori --</option>
                                         {% for cat in categories %}
                                         <option value="{{ cat.id }}" {% if field.category_id == cat.id %}selected{% endif %}>{{ cat.label }}</option>
@@ -84,7 +96,7 @@
                                     </select>
                                 </td>
                                 <td>
-                                    <code class="small text-secondary">{{ field.key }}</code>
+                                    <code class="small" style="color: var(--text-muted);">{{ field.key }}</code>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -93,10 +105,10 @@
                 </div>
 
                 <div class="sticky-actions mt-4 d-flex justify-content-end">
-                    <div class="bg-white p-3 rounded-4 shadow-lg border border-primary-subtle d-flex gap-3 align-items-center">
-                        <span class="text-muted small d-none d-md-inline">Semua pengaturan kategori akan langsung diterapkan di halaman mapping.</span>
+                    <div class="action-bar d-flex gap-3 align-items-center">
+                        <span class="small d-none d-md-inline" style="color: var(--text-muted);">Semua pengaturan kategori akan langsung diterapkan di halaman mapping.</span>
                         <a href="/customers" class="btn btn-light px-4">Batal</a>
-                        <button type="submit" class="btn btn-primary px-5 fw-bold shadow">
+                        <button type="submit" class="btn btn-primary px-5 fw-bold">
                             <i class="bi bi-save me-2"></i>Simpan Perubahan
                         </button>
                     </div>
@@ -129,7 +141,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const row = select.closest('tr');
             // Basic styling based on whether it has a category
             if (select.value) {
-                row.style.borderLeft = '4px solid #0d6efd';
+                row.style.borderLeft = '4px solid var(--accent)';
             } else {
                 row.style.borderLeft = '4px solid transparent';
             }

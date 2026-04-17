@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +8,13 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="/static/css/dashboard.css" rel="stylesheet">
+    <script>
+        // Apply saved theme instantly to prevent flash
+        (function() {
+            var t = localStorage.getItem('col-theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -48,7 +55,7 @@
                 <a class="nav-link dropdown-toggle {% if active_page == 'settings' %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="bi bi-gear"></i> Settings
                 </a>
-                <ul class="dropdown-menu dropdown-menu-dark">
+                <ul class="dropdown-menu">
                     <li><a class="dropdown-item" href="/settings/excel"><i class="bi bi-file-earmark-excel me-2"></i>Excel Mapping</a></li>
                     <li><a class="dropdown-item" href="/settings/visit-statuses"><i class="bi bi-geo-alt me-2"></i>Kunjungan Setting</a></li>
                 </ul>
@@ -66,25 +73,29 @@
         <!-- Top Bar -->
         <div class="top-bar">
             <h5 class="mb-0">{% block page_title %}Dashboard{% endblock %}</h5>
-            <div class="d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center gap-3">
                 {% if current_user %}
-                <span class="text-muted small">
-                    <i class="bi bi-person-circle"></i> {{ current_user.name }}
+                <span class="text-muted small" style="font-weight: 500;">
+                    <i class="bi bi-person-circle me-1"></i>{{ current_user.name }}
                 </span>
                 {% endif %}
+                <button type="button" class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode" id="themeToggleBtn">
+                    <i class="bi bi-sun-fill"></i>
+                    <i class="bi bi-moon-fill"></i>
+                </button>
             </div>
         </div>
 
         <!-- Flash Messages -->
         {% if success %}
         <div class="alert alert-success alert-dismissible fade show alert-floating" role="alert">
-            <i class="bi bi-check-circle me-2"></i>{{ success }}
+            <i class="bi bi-check-circle-fill me-2"></i>{{ success }}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
         {% endif %}
         {% if error %}
         <div class="alert alert-danger alert-dismissible fade show alert-floating" role="alert">
-            <i class="bi bi-exclamation-triangle me-2"></i>{{ error }}
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ error }}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
         {% endif %}

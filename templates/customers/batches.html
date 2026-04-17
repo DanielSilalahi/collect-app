@@ -7,26 +7,26 @@
 {% block content %}
 <div class="row g-3 mb-4">
     <div class="col-lg-8">
-        <div class="card border-0 shadow-sm overflow-hidden">
-            <div class="card-body p-4" style="background: linear-gradient(135deg, #0f3d91 0%, #1e6fd9 58%, #61b3ff 100%);">
+        <div class="card border-0 overflow-hidden animate-in" style="border-radius: 1.25rem; box-shadow: var(--card-shadow);">
+            <div class="card-body p-4" style="background: linear-gradient(135deg, #1E1B4B 0%, #3730A3 50%, #6366F1 100%);">
                 <div class="row align-items-center g-4">
                     <div class="col-md-8 text-white">
-                        <div class="small text-uppercase fw-semibold opacity-75 mb-2">Semi-Normalized Upload</div>
+                        <div class="small text-uppercase fw-semibold mb-2" style="opacity: 0.7; letter-spacing: 0.08em;">Semi-Normalized Upload</div>
                         <h3 class="fw-bold mb-2">Upload file Excel, cocokkan kolom, lalu simpan ke snapshot customer baru.</h3>
-                        <p class="mb-0 opacity-75">Alur upload sekarang memisahkan snapshot customer, data pinjaman, alamat, kontak darurat, dan raw import row agar lebih aman untuk audit dan reparsing.</p>
+                        <p class="mb-0" style="opacity: 0.7;">Alur upload sekarang memisahkan snapshot customer, data pinjaman, alamat, kontak darurat, dan raw import row agar lebih aman untuk audit dan reparsing.</p>
                     </div>
                     <div class="col-md-4">
-                        <div class="rounded-4 bg-white bg-opacity-10 border border-white border-opacity-25 p-3 text-white">
+                        <div class="rounded-4 p-3 text-white" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); backdrop-filter: blur(8px);">
                             <div class="d-flex align-items-center gap-2 mb-2">
-                                <span class="badge bg-light text-primary">1</span>
+                                <span class="badge" style="background: rgba(255,255,255,0.15); color: #fff;">1</span>
                                 <span class="small fw-semibold">Pilih file `.xlsx`</span>
                             </div>
                             <div class="d-flex align-items-center gap-2 mb-2">
-                                <span class="badge bg-light text-primary">2</span>
+                                <span class="badge" style="background: rgba(255,255,255,0.15); color: #fff;">2</span>
                                 <span class="small fw-semibold">Mapping header partner</span>
                             </div>
                             <div class="d-flex align-items-center gap-2">
-                                <span class="badge bg-light text-primary">3</span>
+                                <span class="badge" style="background: rgba(255,255,255,0.15); color: #fff;">3</span>
                                 <span class="small fw-semibold">Import ke model semi-normalized</span>
                             </div>
                         </div>
@@ -36,19 +36,19 @@
         </div>
     </div>
     <div class="col-lg-4">
-        <div class="card border-0 shadow-sm h-100">
+        <div class="card border-0 h-100 animate-in" style="border-radius: 1.25rem; box-shadow: var(--card-shadow); border: 1px solid var(--border-color); background: var(--bg-surface);">
             <div class="card-body p-4">
-                <div class="small text-uppercase fw-semibold text-primary mb-2">Format Didukung</div>
-                <h5 class="fw-bold mb-3">Header bisa fleksibel, mapping-nya dipilih di langkah berikut.</h5>
-                <ul class="list-unstyled small text-muted mb-0">
+                <div class="small text-uppercase fw-semibold mb-2" style="color: var(--accent); letter-spacing: 0.06em;">Format Didukung</div>
+                <h5 class="fw-bold mb-3" style="color: var(--text-heading);">Header bisa fleksibel, mapping-nya dipilih di langkah berikut.</h5>
+                <ul class="list-unstyled small mb-0" style="color: var(--text-secondary);">
                     {% for field in priority_fields[:8] %}
                     <li class="mb-2">
-                        <i class="bi bi-check2-circle text-success me-2"></i>
-                        {{ field.label }} <span class="opacity-75">(e.g. {{ field.example }})</span>
+                        <i class="bi bi-check2-circle me-2" style="color: var(--success);"></i>
+                        {{ field.label }} <span style="opacity: 0.65;">(e.g. {{ field.example }})</span>
                     </li>
                     {% endfor %}
                     {% if priority_fields|length > 8 %}
-                    <li class="text-primary fw-semibold">+ {{ priority_fields|length - 8 }} field lainnya</li>
+                    <li style="color: var(--accent); font-weight: 600;">+ {{ priority_fields|length - 8 }} field lainnya</li>
                     {% endif %}
                 </ul>
             </div>
@@ -58,22 +58,22 @@
 
 <div class="row align-items-center mb-3">
     <div class="col-md-6">
-        <h5 class="mb-0 text-muted">Daftar Batch Upload</h5>
+        <h5 class="mb-0" style="color: var(--text-secondary);">Daftar Batch Upload</h5>
     </div>
     <div class="col-md-6 text-end">
-        <button type="button" class="btn btn-success btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#uploadModal">
+        <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#uploadModal" style="border-radius: 0.625rem;">
             <i class="bi bi-upload me-1"></i>Upload Excel Baru
         </button>
     </div>
 </div>
 
-<div class="table-card">
+<div class="table-card animate-in">
     <div class="card-header border-bottom">
         <span class="fw-semibold"><i class="bi bi-folder2-open me-2"></i>History Import Data</span>
     </div>
     <div class="table-responsive">
         <table class="table table-hover mb-0 align-middle">
-            <thead class="table-light">
+            <thead>
                 <tr>
                     <th>Batch / Kategori</th>
                     <th>Tanggal Input</th>
@@ -86,15 +86,15 @@
                 {% for b in batches %}
                 <tr id="batch-row-{{ b.upload_batch }}">
                     <td>
-                        <div class="fw-bold text-primary">{{ b.upload_batch if b.upload_batch else "Input Manual / Tanpa Batch" }}</div>
+                        <div class="fw-bold" style="color: var(--accent);">{{ b.upload_batch if b.upload_batch else "Input Manual / Tanpa Batch" }}</div>
                         <div class="small text-muted">{{ "Dari file excel" if b.upload_batch else "Ditambahkan satu persatu / terlewat" }}</div>
                     </td>
                     <td>{{ b.upload_date.strftime('%d %b %Y, %H:%M') if b.upload_date else '-' }}</td>
                     <td><span class="badge bg-secondary">{{ b.total_customers }} Customers</span></td>
                     <td>
-                        <div class="progress mb-1" style="height: 6px; width: 120px;">
+                        <div class="progress mb-1" style="height: 5px; width: 120px;">
                             {% set pct = (b.assigned_count / b.total_customers * 100)|int if b.total_customers > 0 else 0 %}
-                            <div class="progress-bar bg-success" style="width: {{ pct }}%"></div>
+                            <div class="progress-bar" style="width: {{ pct }}%; background: var(--success);"></div>
                         </div>
                         <span class="small text-muted">{{ b.assigned_count }} / {{ b.total_customers }} Assigned</span>
                     </td>
@@ -122,18 +122,18 @@
 
 <div class="modal fade" id="uploadModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-upload me-2"></i>Upload Data Customer</h5>
+        <div class="modal-content">
+            <div class="modal-header" style="background: var(--accent); border-bottom: none;">
+                <h5 class="modal-title" style="color: #fff;"><i class="bi bi-upload me-2"></i>Upload Data Customer</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form id="uploadForm" method="POST" action="/customers/upload" enctype="multipart/form-data" data-loading-text="Mengunggah file Excel...">
                 <div class="modal-body">
-                    <div class="rounded-4 border border-primary-subtle bg-primary-subtle bg-opacity-25 p-3 mb-3">
+                    <div class="rounded-3 p-3 mb-3" style="background: var(--accent-subtle); border: 1px solid rgba(99,102,241,0.15);">
                         <div class="d-flex align-items-start gap-3">
-                            <div class="fs-3 text-primary"><i class="bi bi-file-earmark-spreadsheet"></i></div>
+                            <div class="fs-3" style="color: var(--accent);"><i class="bi bi-file-earmark-spreadsheet"></i></div>
                             <div>
-                                <div class="fw-semibold text-dark mb-1">Upload sekarang lanjut ke layar mapping header</div>
+                                <div class="fw-semibold mb-1" style="color: var(--text-heading);">Upload sekarang lanjut ke layar mapping header</div>
                                 <div class="small text-muted">Baris pertama harus berisi nama kolom. Setelah file dipilih, sistem akan meminta Anda mencocokkan header partner ke field customer baru.</div>
                             </div>
                         </div>
@@ -153,9 +153,9 @@
                         </select>
                     </div>
                 </div>
-                <div class="modal-footer bg-light">
+                <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn     btn-success" onclick="if(this.form.checkValidity()) setLoading(true, 'Mengunggah file Excel...', 'Membatalkan unggahan file...')"><i class="bi bi-upload me-1"></i>Upload & Lanjut ke Mapping</button>
+                    <button type="submit" class="btn btn-success" onclick="if(this.form.checkValidity()) setLoading(true, 'Mengunggah file Excel...', 'Membatalkan unggahan file...')"><i class="bi bi-upload me-1"></i>Upload & Lanjut ke Mapping</button>
                 </div>
             </form>
         </div>

@@ -8,16 +8,27 @@
 <style>
     .category-card {
         border-radius: 1rem;
-        border: 1px solid rgba(0,0,0,0.05);
+        border: 1px solid var(--border-color);
+        background: var(--bg-surface);
         transition: all 0.3s;
     }
     .category-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+        transform: translateY(-4px);
+        box-shadow: var(--card-shadow-hover);
+        border-color: var(--accent-subtle);
     }
     .system-badge {
         font-size: 0.65rem;
         letter-spacing: 0.5px;
+    }
+    .cat-icon-wrap {
+        background: var(--accent-subtle);
+        color: var(--accent);
+        border-radius: 0.75rem;
+        padding: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 </style>
 {% endblock %}
@@ -25,9 +36,9 @@
 {% block content %}
 <div class="row g-4">
     <div class="col-md-4">
-        <div class="card border-0 shadow-sm rounded-4">
+        <div class="card border-0 rounded-4 animate-in" style="box-shadow: var(--card-shadow);">
             <div class="card-body p-4">
-                <h5 class="fw-bold mb-3">Tambah Kategori Baru</h5>
+                <h5 class="fw-bold mb-3" style="color: var(--text-heading);">Tambah Kategori Baru</h5>
                 <form action="/settings/excel/categories/save" method="POST">
                     <input type="hidden" name="id" id="edit_id">
                     <div class="mb-3">
@@ -57,19 +68,19 @@
         <div class="row row-cols-1 row-cols-lg-2 g-3">
             {% for cat in categories %}
             <div class="col">
-                <div class="card category-card h-100 p-3">
+                <div class="card category-card h-100 p-3 animate-in">
                     <div class="d-flex align-items-center gap-3 mb-2">
-                        <div class="bg-primary bg-opacity-10 text-primary rounded-3 p-2">
+                        <div class="cat-icon-wrap">
                             <i class="bi {{ cat.icon }} fs-4"></i>
                         </div>
                         <div class="flex-grow-1">
                             <div class="d-flex align-items-center gap-2">
-                                <h6 class="fw-bold mb-0 text-dark">{{ cat.label }}</h6>
+                                <h6 class="fw-bold mb-0" style="color: var(--text-heading);">{{ cat.label }}</h6>
                                 {% if cat.is_system %}
-                                <span class="badge text-bg-secondary opacity-75 system-badge">SYSTEM</span>
+                                <span class="badge system-badge" style="background: var(--bg-surface-2); color: var(--text-muted); border: 1px solid var(--border-color);">SYSTEM</span>
                                 {% endif %}
                             </div>
-                            <code class="small text-muted">{{ cat.key }}</code>
+                            <code class="small" style="color: var(--text-muted);">{{ cat.key }}</code>
                         </div>
                         <div class="dropdown">
                             <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown">
@@ -88,14 +99,14 @@
                             </ul>
                         </div>
                     </div>
-                    <p class="small text-muted mb-0">{{ cat.description or 'Tidak ada deskripsi.' }}</p>
+                    <p class="small mb-0" style="color: var(--text-muted);">{{ cat.description or 'Tidak ada deskripsi.' }}</p>
                 </div>
             </div>
             {% endfor %}
         </div>
         
         <div class="mt-4 text-end">
-            <a href="/settings/excel" class="btn btn-outline-primary px-4 shadow-sm">
+            <a href="/settings/excel" class="btn btn-outline-primary px-4">
                 <i class="bi bi-arrow-left me-2"></i>Kembali ke Penugasan Field
             </a>
         </div>

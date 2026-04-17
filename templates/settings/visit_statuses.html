@@ -7,7 +7,7 @@
 {% block content %}
 <div class="row mb-3">
     <div class="col">
-        <h5 class="text-muted">Kelola opsi "Hasil Kunjungan" yang muncul di aplikasi mobile</h5>
+        <h5 style="color: var(--text-secondary);">Kelola opsi "Hasil Kunjungan" yang muncul di aplikasi mobile</h5>
     </div>
     <div class="col-auto">
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addStatusModal">
@@ -16,7 +16,7 @@
     </div>
 </div>
 
-<div class="table-card">
+<div class="table-card animate-in">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead>
@@ -33,27 +33,27 @@
             <tbody>
                 {% for s in statuses %}
                 <tr>
-                    <td>{{ s.display_order }}</td>
+                    <td style="color: var(--text-secondary);">{{ s.display_order }}</td>
                     <td>
-                        <div class="fw-bold">{{ s.label }}</div>
+                        <div class="fw-bold" style="color: var(--text-heading);">{{ s.label }}</div>
                         <small class="text-muted">{{ s.key }}</small>
                     </td>
                     <td>
-                        <span class="badge" style="background-color: {{ s.color_code }};">{{ s.label }}</span>
+                        <span class="badge" style="background-color: {{ s.color_code }}; color: #fff;">{{ s.label }}</span>
                     </td>
-                    <td><i class="bi {{ s.icon }} fs-5"></i></td>
+                    <td><i class="bi {{ s.icon }} fs-5" style="color: var(--text-secondary);"></i></td>
                     <td>
                         {% if s.is_ptp %}
-                        <span class="text-success"><i class="bi bi-check-circle-fill"></i> Ya</span>
+                        <span style="color: var(--success);"><i class="bi bi-check-circle-fill"></i> Ya</span>
                         {% else %}
                         <span class="text-muted">-</span>
                         {% endif %}
                     </td>
                     <td>
                         {% if s.is_active %}
-                        <span class="badge bg-success">Aktif</span>
+                        <span class="badge" style="background: var(--success-subtle); color: var(--success);">Aktif</span>
                         {% else %}
-                        <span class="badge bg-secondary">Non-aktif</span>
+                        <span class="badge" style="background: var(--bg-surface-2); color: var(--text-muted);">Non-aktif</span>
                         {% endif %}
                     </td>
                     <td class="text-end">
@@ -142,7 +142,7 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Warna</label>
-                            <input type="color" class="form-control form-control-color w-100" name="color_code" value="#4F46E5">
+                            <input type="color" class="form-control form-control-color w-100" name="color_code" value="#6366F1">
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Icon (BI Class)</label>

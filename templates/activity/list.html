@@ -6,7 +6,7 @@
 
 {% block content %}
 <!-- Filter Bar -->
-<div class="filter-bar">
+<div class="filter-bar animate-in">
     <form method="GET" action="/activity-logs" class="row g-2 align-items-end">
         <div class="col-md-3">
             <label class="form-label small fw-semibold">Action Type</label>
@@ -40,7 +40,7 @@
 </div>
 
 <!-- Logs Table -->
-<div class="table-card">
+<div class="table-card animate-in">
     <div class="card-header">
         <i class="bi bi-clock-history me-2"></i>Activity Logs ({{ total }})
     </div>
@@ -58,11 +58,11 @@
             <tbody>
                 {% for log in logs %}
                 <tr>
-                    <td class="small text-muted text-nowrap">{{ log.timestamp.strftime('%d/%m/%Y %H:%M:%S') if log.timestamp else '-' }}</td>
-                    <td><strong>{{ log.user.name if log.user else '-' }}</strong><br><small class="text-muted">{{ log.user.role if log.user else '' }}</small></td>
+                    <td class="small text-nowrap" style="color: var(--text-muted);">{{ log.timestamp.strftime('%d/%m/%Y %H:%M:%S') if log.timestamp else '-' }}</td>
+                    <td><strong style="color: var(--text-heading);">{{ log.user.name if log.user else '-' }}</strong><br><small class="text-muted">{{ log.user.role if log.user else '' }}</small></td>
                     <td><span class="badge bg-secondary">{{ log.action }}</span></td>
-                    <td class="small" style="max-width: 400px; word-break: break-word;">{{ log.detail or '-' }}</td>
-                    <td class="small text-muted">{{ log.ip_address or '-' }}</td>
+                    <td class="small" style="max-width: 400px; word-break: break-word; color: var(--text-secondary);">{{ log.detail or '-' }}</td>
+                    <td class="small" style="color: var(--text-muted);">{{ log.ip_address or '-' }}</td>
                 </tr>
                 {% endfor %}
                 {% if not logs %}
@@ -74,7 +74,7 @@
 
     <!-- Pagination -->
     {% if total_pages > 1 %}
-    <div class="p-3 border-top">
+    <div class="p-3" style="border-top: 1px solid var(--border-color);">
         <nav>
             <ul class="pagination pagination-sm justify-content-center mb-0">
                 <li class="page-item {% if page == 1 %}disabled{% endif %}">

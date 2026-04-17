@@ -8,52 +8,52 @@
 <!-- Stat Cards -->
 <div class="row g-3 mb-4">
     <div class="col-md-3">
-        <div class="stat-card">
+        <div class="stat-card animate-in">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
                     <div class="stat-label">Total Customer</div>
                     <div class="stat-value">{{ total_customers }}</div>
                 </div>
-                <div class="stat-icon" style="background: #4f46e5;">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #6366F1, #818CF8);">
                     <i class="bi bi-people-fill"></i>
                 </div>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="stat-card">
+        <div class="stat-card animate-in">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
                     <div class="stat-label">Total Agent</div>
                     <div class="stat-value">{{ total_agents }}</div>
                 </div>
-                <div class="stat-icon" style="background: #06b6d4;">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #06B6D4, #22D3EE);">
                     <i class="bi bi-person-badge-fill"></i>
                 </div>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="stat-card">
+        <div class="stat-card animate-in">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
                     <div class="stat-label">Collection Hari Ini</div>
-                    <div class="stat-value">{{ collections_today }}</div>
+                    <div class="stat-value" style="color: var(--success);">{{ collections_today }}</div>
                 </div>
-                <div class="stat-icon" style="background: #10b981;">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #22C55E, #4ADE80);">
                     <i class="bi bi-check-circle-fill"></i>
                 </div>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="stat-card">
+        <div class="stat-card animate-in">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
                     <div class="stat-label">Pending VA</div>
-                    <div class="stat-value text-warning">{{ pending_va }}</div>
+                    <div class="stat-value" style="color: var(--warning);">{{ pending_va }}</div>
                 </div>
-                <div class="stat-icon" style="background: #f59e0b;">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #F59E0B, #FBBF24);">
                     <i class="bi bi-credit-card-fill"></i>
                 </div>
             </div>
@@ -64,32 +64,32 @@
 <!-- Status Breakdown -->
 <div class="row g-3 mb-4">
     <div class="col-md-8">
-        <div class="table-card">
+        <div class="table-card animate-in">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-bar-chart me-2"></i>Status Customer</span>
             </div>
             <div class="p-3">
                 <div class="row g-2">
                     <div class="col-md-3">
-                        <div class="border rounded p-3 text-center">
-                            <div class="fw-bold fs-4 text-danger">{{ belum }}</div>
+                        <div class="rounded-3 p-3 text-center" style="background: var(--danger-subtle); border: 1px solid rgba(239,68,68,0.15);">
+                            <div class="fw-bold fs-4" style="color: var(--danger);">{{ belum }}</div>
                             <small class="text-muted">Belum</small>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="border rounded p-3 text-center">
-                            <div class="fw-bold fs-4 text-warning">{{ janji_bayar }}</div>
+                        <div class="rounded-3 p-3 text-center" style="background: var(--warning-subtle); border: 1px solid rgba(245,158,11,0.15);">
+                            <div class="fw-bold fs-4" style="color: var(--warning);">{{ janji_bayar }}</div>
                             <small class="text-muted">Janji Bayar</small>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="border rounded p-3 text-center">
-                            <div class="fw-bold fs-4 text-success">{{ bayar }}</div>
+                        <div class="rounded-3 p-3 text-center" style="background: var(--success-subtle); border: 1px solid rgba(34,197,94,0.15);">
+                            <div class="fw-bold fs-4" style="color: var(--success);">{{ bayar }}</div>
                             <small class="text-muted">Bayar</small>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="border rounded p-3 text-center">
+                        <div class="rounded-3 p-3 text-center" style="background: rgba(100,116,139,0.08); border: 1px solid rgba(100,116,139,0.12);">
                             <div class="fw-bold fs-4 text-secondary">{{ tidak_ketemu }}</div>
                             <small class="text-muted">Tidak Ketemu</small>
                         </div>
@@ -97,15 +97,15 @@
                 </div>
 
                 {% if total_customers > 0 %}
-                <div class="progress mt-3" style="height: 12px; border-radius: 8px;">
+                <div class="progress mt-3" style="height: 10px; border-radius: 8px;">
                     {% set belum_pct = (belum / total_customers * 100) if total_customers > 0 else 0 %}
                     {% set janji_pct = (janji_bayar / total_customers * 100) if total_customers > 0 else 0 %}
                     {% set bayar_pct = (bayar / total_customers * 100) if total_customers > 0 else 0 %}
                     {% set tk_pct = (tidak_ketemu / total_customers * 100) if total_customers > 0 else 0 %}
-                    <div class="progress-bar bg-danger" style="width: {{ belum_pct }}%" title="Belum"></div>
-                    <div class="progress-bar bg-warning" style="width: {{ janji_pct }}%" title="Janji Bayar"></div>
-                    <div class="progress-bar bg-success" style="width: {{ bayar_pct }}%" title="Bayar"></div>
-                    <div class="progress-bar bg-secondary" style="width: {{ tk_pct }}%" title="Tidak Ketemu"></div>
+                    <div class="progress-bar" style="width: {{ belum_pct }}%; background: var(--danger);" title="Belum"></div>
+                    <div class="progress-bar" style="width: {{ janji_pct }}%; background: var(--warning);" title="Janji Bayar"></div>
+                    <div class="progress-bar" style="width: {{ bayar_pct }}%; background: var(--success);" title="Bayar"></div>
+                    <div class="progress-bar" style="width: {{ tk_pct }}%; background: #64748B;" title="Tidak Ketemu"></div>
                 </div>
                 {% endif %}
             </div>
@@ -113,9 +113,9 @@
     </div>
 
     <div class="col-md-4">
-        <div class="table-card h-100">
+        <div class="table-card h-100 animate-in">
             <div class="card-header">
-                <i class="bi bi-lightning me-2"></i>Quick Actions
+                <i class="bi bi-lightning-fill me-2"></i>Quick Actions
             </div>
             <div class="p-3">
                 <a href="/customers" class="btn btn-outline-primary w-100 mb-2">
@@ -133,7 +133,7 @@
 </div>
 
 <!-- Recent Activity -->
-<div class="table-card">
+<div class="table-card animate-in">
     <div class="card-header">
         <i class="bi bi-clock-history me-2"></i>Aktivitas Terbaru
     </div>
