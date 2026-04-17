@@ -29,7 +29,7 @@ def list_customers(
         total=base_query.count(),
         bayar=base_query.filter(Customer.status == 'bayar').count(),
         janji_bayar=base_query.filter(Customer.status == 'janji_bayar').count(),
-        belum=base_query.filter(Customer.status == 'belum').count(),
+        belum=base_query.filter(Customer.status == 'new').count(),
         tidak_ketemu=base_query.filter(Customer.status == 'tidak_ketemu').count(),
     )
 

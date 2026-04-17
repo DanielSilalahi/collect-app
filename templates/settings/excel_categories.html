@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% set active_page = "settings" %}
+
+{% block title %}Kelola Kategori Excel{% endblock %}
+{% block page_title %}Kelola Kategori Excel{% endblock %}
+
+{% block extra_css %}
+<style>
+    .category-card {
+        border-radius: 1rem;
+        border: 1px solid rgba(0,0,0,0.05);
+        transition: all 0.3s;
+    }
+    .category-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+    }
+    .system-badge {
+        font-size: 0.65rem;
+        letter-spacing: 0.5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-3">Tambah Kategori Baru</h5>
+                <form action="/settings/excel/categories/save" method="POST">
+                    <input type="hidden" name="id" id="edit_id">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Nama Kategori</label>
+                        <input type="text" class="form-control" name="label" id="edit_label" required placeholder="Misal: Alamat EC">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Ikon Bootstrap (bi-*)</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-folder" id="icon_preview"></i></span>
+                            <input type="text" class="form-control" name="icon" id="edit_icon" value="bi-folder">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Deskripsi</label>
+                        <textarea class="form-control" name="description" id="edit_description" rows="3"></textarea>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary fw-bold" id="btn_submit">Tambah Kategori</button>
+                        <button type="button" class="btn btn-link btn-sm mt-2 d-none" id="btn_cancel" onclick="resetForm()">Batal Edit</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="row row-cols-1 row-cols-lg-2 g-3">
+            {% for cat in categories %}
+            <div class="col">
+                <div class="card category-card h-100 p-3">
+                    <div class="d-flex align-items-center gap-3 mb-2">
+                        <div class="bg-primary bg-opacity-10 text-primary rounded-3 p-2">
+                            <i class="bi {{ cat.icon }} fs-4"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-items-center gap-2">
+                                <h6 class="fw-bold mb-0 text-dark">{{ cat.label }}</h6>
+                                {% if cat.is_system %}
+                                <span class="badge text-bg-secondary opacity-75 system-badge">SYSTEM</span>
+                                {% endif %}
+                            </div>
+                            <code class="small text-muted">{{ cat.key }}</code>
+                        </div>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-three-dots-vertical"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="javascript:void(0)" onclick="editCategory({{ cat.id }}, '{{ cat.label }}', '{{ cat.icon }}', '{{ cat.description or '' }}')"><i class="bi bi-pencil me-2"></i>Edit</a></li>
+                                {% if not cat.is_system %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <form action="/settings/excel/categories/delete/{{ cat.id }}" method="POST" onsubmit="return confirm('Hapus kategori ini? Field di dalamnya akan dipindahkan ke kategori tidak teratur.')">
+                                        <button type="submit" class="dropdown-item text-danger"><i class="bi bi-trash me-2"></i>Hapus</button>
+                                    </form>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                    <p class="small text-muted mb-0">{{ cat.description or 'Tidak ada deskripsi.' }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div class="mt-4 text-end">
+            <a href="/settings/excel" class="btn btn-outline-primary px-4 shadow-sm">
+                <i class="bi bi-arrow-left me-2"></i>Kembali ke Penugasan Field
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function editCategory(id, label, icon, desc) {
+    document.getElementById('edit_id').value = id;
+    document.getElementById('edit_label').value = label;
+    document.getElementById('edit_icon').value = icon;
+    document.getElementById('edit_description').value = desc;
+    document.getElementById('icon_preview').className = 'bi ' + icon;
+    document.getElementById('btn_submit').textContent = 'Simpan Perubahan';
+    document.getElementById('btn_cancel').classList.remove('d-none');
+}
+
+function resetForm() {
+    document.getElementById('edit_id').value = '';
+    document.getElementById('edit_label').value = '';
+    document.getElementById('edit_icon').value = 'bi-folder';
+    document.getElementById('edit_description').value = '';
+    document.getElementById('icon_preview').className = 'bi bi-folder';
+    document.getElementById('btn_submit').textContent = 'Tambah Kategori';
+    document.getElementById('btn_cancel').classList.add('d-none');
+}
+
+document.getElementById('edit_icon').addEventListener('input', function() {
+    document.getElementById('icon_preview').className = 'bi ' + this.value;
+});
+</script>
+{% endblock %}

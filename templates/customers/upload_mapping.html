@@ -39,35 +39,32 @@
 
     .mapping-grid {
         display: grid;
-        grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.9fr);
-        gap: 1.25rem;
+        grid-template-columns: 1fr 1.2fr;
+        gap: 1.5rem;
+        align-items: start;
     }
 
     .mapping-panel {
         border: 1px solid rgba(15, 23, 42, 0.08);
         border-radius: 1.25rem;
         background: #fff;
-        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+    }
+    
+    .sticky-footer {
+        position: sticky;
+        bottom: 0;
+        background: white;
+        z-index: 1000;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        border-top: 1px solid rgba(0,0,0,0.05);
+        margin-top: 2rem;
+        grid-column: 1 / -1;
     }
 
-    .mapping-table tbody tr:hover {
-        background: rgba(13, 110, 253, 0.03);
-    }
-
-    .mapping-category {
-        border: 1px solid rgba(15, 23, 42, 0.08);
-        border-radius: 1rem;
-        overflow: hidden;
-    }
-
-    .mapping-category + .mapping-category {
-        margin-top: 1rem;
-    }
-
-    .mapping-category-head {
-        background: linear-gradient(180deg, rgba(13, 110, 253, 0.08) 0%, rgba(13, 110, 253, 0.02) 100%);
-        padding: 0.9rem 1rem;
-        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    .text-muted-extra {
+        color: #94a3b8;
     }
 
     @media (max-width: 991.98px) {
@@ -80,15 +77,15 @@
 
 {% block content %}
 <div class="mapping-shell">
-    <div class="mapping-hero p-4 p-lg-5">
+    <div class="mapping-hero p-4 p-lg-5 mb-2">
         <div class="row align-items-center g-4">
             <div class="col-lg-7">
                 <div class="small text-uppercase fw-semibold muted mb-2">Langkah 2 dari 2</div>
-                <h2 class="fw-bold mb-3">Cocokkan header Excel ke semua field bisnis customer semi-normalized sebelum import dimulai.</h2>
-                <p class="muted mb-0">Setiap pilihan di bawah menentukan apakah nilai masuk ke snapshot customer, alamat, pinjaman aktif, kontak tambahan, atau metadata raw import untuk audit. Field sistem internal sengaja tidak ditampilkan.</p>
+                <h2 class="fw-bold mb-3">Field Mapping Bisnis</h2>
+                <p class="muted mb-0">Cocokkan kolom Excel partner ke dalam sistem. Gunakan kolom kiri untuk data utama dan kolom kanan untuk detail tambahan.</p>
             </div>
             <div class="col-lg-5">
-                <div class="mapping-tags">
+                <div class="mapping-tags justify-content-lg-end">
                     {% for header in headers %}
                     <span>{{ header }}</span>
                     {% endfor %}
@@ -97,91 +94,120 @@
         </div>
     </div>
 
-    <form method="POST" action="/customers/upload/process" class="mapping-grid">
+    <form id="mappingForm" method="POST" action="/customers/upload/process" data-loading-text="Sedang memproses & mengimpor data...">
         <input type="hidden" name="temp_filename" value="{{ temp_filename }}">
         <input type="hidden" name="agent_id" value="{{ agent_id }}">
 
-        <div class="mapping-panel p-3 p-lg-4">
-            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
-                <div>
-                    <h5 class="mb-1 fw-bold"><i class="bi bi-diagram-3 me-2 text-primary"></i>Field Mapping per Kategori</h5>
-                    <div class="small text-muted">Sistem mendeteksi <strong>{{ headers|length }} kolom</strong>. Semua field bisnis yang bisa di-import ditampilkan dan dibagi per kategori supaya user bisa menyesuaikan sendiri dengan format partner.</div>
+        <div class="mapping-grid">
+            <!-- LEFT COLUMN: Identity (Static Card) -->
+            <div class="mapping-panel p-4">
+                {% for group in category_groups if group.key == 'identity' %}
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="mb-0 fw-bold text-primary"><i class="bi {{ group.icon }} me-2"></i>{{ group.label }}</h5>
+                    <span class="badge rounded-pill text-bg-primary">{{ group.fields|length }} field</span>
                 </div>
-                <div class="small text-muted"><span class="text-danger fw-semibold">*</span> wajib dipilih</div>
-            </div>
+                <p class="small text-muted mb-4">{{ group.description }}</p>
 
-            {% for group in category_groups %}
-            <section class="mapping-category">
-                <div class="mapping-category-head">
-                    <div class="d-flex justify-content-between align-items-start gap-3">
-                        <div>
-                            <div class="fw-semibold text-dark"><i class="bi {{ group.icon }} me-2 text-primary"></i>{{ group.label }}</div>
-                            <div class="small text-muted mt-1">{{ group.description }}</div>
-                        </div>
-                        <span class="badge text-bg-light">{{ group.fields|length }} field</span>
-                    </div>
-                </div>
                 <div class="table-responsive">
-                    <table class="table table-sm align-middle mapping-table mb-0">
+                    <table class="table table-hover align-middle mapping-table mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th width="46%">Field tujuan</th>
-                                <th width="54%">Header Excel</th>
+                                <th width="45%" class="small fw-bold text-uppercase">Field Utama</th>
+                                <th width="55%" class="small fw-bold text-uppercase">Excel Header</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for field in group.fields %}
                             <tr>
-                                <td>
-                                    <div class="fw-semibold text-dark">{{ field.label }}</div>
-                                    <div class="small text-muted">{{ field.key }}</div>
+                                <td class="py-2">
+                                    <div class="fw-semibold text-dark" style="font-size: 0.9rem;">{{ field.label }} {% if field.required %}<span class="text-danger">*</span>{% endif %}</div>
+                                    <div class="small text-muted-extra mt-0.5" style="font-size: 0.75rem;">Contoh: {{ field.example }}</div>
                                 </td>
                                 <td>
-                                    <select class="form-select form-select-sm" name="mapped_{{ field.key }}" {% if field.required %}required{% endif %}>
-                                        <option value="">-- Abaikan field ini --</option>
+                                    {% set suggested_idx = suggested_mappings.get(field.key) %}
+                                    <select class="form-select form-select-sm border-secondary-subtle" name="mapped_{{ field.key }}" {% if field.required %}required{% endif %}>
+                                        <option value="">- Abaikan -</option>
                                         {% for header in headers %}
-                                        <option value="{{ loop.index0 }}">{{ header }}</option>
+                                        <option value="{{ loop.index0 }}" {% if suggested_idx == loop.index0 %}selected{% endif %}>{{ header }}</option>
                                         {% endfor %}
                                     </select>
+                                    {% if suggested_idx is not none %}
+                                    <div class="small text-success mt-1 fw-semibold"><i class="bi bi-magic me-1"></i>Auto</div>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
-            </section>
-            {% endfor %}
+                {% endfor %}
+            </div>
 
-            <div class="d-flex justify-content-between mt-4 border-top pt-3">
-                <a href="/customers" class="btn btn-outline-secondary px-4">Batal</a>
-                <button type="submit" class="btn btn-success px-4">
-                    <i class="bi bi-check2-circle me-1"></i>Mulai Import
+            <!-- RIGHT COLUMN: Other Categories (Accordion) -->
+            <div>
+                <div class="mb-3 ps-2">
+                    <h6 class="fw-bold text-secondary text-uppercase small"><i class="bi bi-plus-circle me-2"></i>Detail Tambahan (Opsional)</h6>
+                </div>
+                <div class="accordion border-0" id="mappingAccordion">
+                    {% for group in category_groups if group.key != 'identity' %}
+                    <div class="accordion-item mapping-panel border-0 mb-3 overflow-hidden">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed px-4 py-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ group.key }}" aria-expanded="false" aria-controls="collapse{{ group.key }}">
+                                <div class="d-flex align-items-center w-100">
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold text-dark"><i class="bi {{ group.icon }} me-2 text-primary"></i>{{ group.label }}</div>
+                                        <div class="small text-muted mt-1 fw-normal">{{ group.fields|length }} field tersedia</div>
+                                    </div>
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="collapse{{ group.key }}" class="accordion-collapse collapse" data-bs-parent="#mappingAccordion">
+                            <div class="accordion-body p-0 border-top">
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mapping-table mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th width="45%" class="ps-4 small fw-bold text-uppercase">Field</th>
+                                                <th width="55%" class="pe-4 small fw-bold text-uppercase">Excel Header</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for field in group.fields %}
+                                            <tr>
+                                                <td class="ps-4 py-2">
+                                                    <div class="fw-semibold text-dark" style="font-size: 0.9rem;">{{ field.label }} {% if field.required %}<span class="text-danger">*</span>{% endif %}</div>
+                                                    <div class="small text-muted-extra mt-0.5" style="font-size: 0.75rem;">Contoh: {{ field.example }}</div>
+                                                </td>
+                                                <td class="pe-4 py-3">
+                                                    {% set suggested_idx = suggested_mappings.get(field.key) %}
+                                                    <select class="form-select form-select-sm border-secondary-subtle" name="mapped_{{ field.key }}" {% if field.required %}required{% endif %}>
+                                                        <option value="">- Abaikan -</option>
+                                                        {% for header in headers %}
+                                                        <option value="{{ loop.index0 }}" {% if suggested_idx == loop.index0 %}selected{% endif %}>{{ header }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                    {% if suggested_idx is not none %}
+                                                    <div class="small text-success mt-1 fw-semibold"><i class="bi bi-magic me-1"></i>Auto</div>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- STICKY FOOTER -->
+            <div class="sticky-footer px-4 d-flex justify-content-between align-items-center">
+                <a href="/customers" class="btn btn-outline-secondary px-4">Batal & Kembali</a>
+                <button type="submit" class="btn btn-primary btn-lg px-5 shadow-sm fw-bold" onclick="if(this.form.checkValidity()) setLoading(true, 'Sedang memproses & mengimpor data...', 'Membatalkan proses impor...')">
+                    <i class="bi bi-cloud-upload-fill me-2"></i>Lanjutkan & Import Data
                 </button>
-            </div>
-        </div>
-
-        <div class="mapping-panel p-3 p-lg-4">
-            <div class="small text-uppercase fw-semibold text-primary mb-2">Panduan Cepat</div>
-            <h5 class="fw-bold mb-3">Cara memilih mapping yang aman</h5>
-                <div class="small text-muted mb-3">Pilih hanya kolom yang benar-benar tersedia di file partner. Field yang tidak dipilih akan dilewati, bukan menyebabkan import gagal.</div>
-
-            <div class="border rounded-4 p-3 mb-3 bg-light-subtle">
-                <div class="fw-semibold mb-2">Prioritas minimal</div>
-                <ul class="small text-muted mb-0 ps-3">
-                    <li>`full_name` wajib untuk membuat customer</li>
-                    <li>`primary_phone` membantu dashboard dan follow-up</li>
-                    <li>`loan_number`, `total_outstanding`, dan `overdue_days` membantu mengisi snapshot pinjaman aktif</li>
-                </ul>
-            </div>
-
-            <div class="border rounded-4 p-3 mb-3">
-                <div class="fw-semibold mb-2">Koordinat lokasi</div>
-                <div class="small text-muted">Kalau partner hanya mengirim satu kolom gabungan seperti `Lat&Lng`, pilih ke `raw_lat_lng`. Nilai aslinya tetap disimpan walau belum dipecah ke `lat` dan `lng`.</div>
-            </div>
-
-            <div class="border rounded-4 p-3">
-                <div class="fw-semibold mb-2">Kontak tambahan</div>
-                <div class="small text-muted">Gunakan field kategori kontak seperti `contact_name`, `contact_phone_number`, `relationship_label`, atau `contact_role` bila file partner punya PIC tambahan selain nomor utama nasabah.</div>
             </div>
         </div>
     </form>

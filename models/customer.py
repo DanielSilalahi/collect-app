@@ -50,4 +50,4 @@ class Customer(Base):
     )
     import_rows = relationship("CustomerImportRow", back_populates="customer", cascade="all, delete-orphan")
     collections = relationship("Collection", back_populates="customer", cascade="all, delete-orphan")
-    va_requests = relationship("VaRequest", back_populates="customer", cascade="all, delete-orphan")
+    va_requests = relationship("VaRequest", back_populates="customer")

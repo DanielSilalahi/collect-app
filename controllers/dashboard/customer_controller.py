@@ -1,4 +1,5 @@
 import io
+import asyncio
 import math
 import re
 from urllib.parse import quote
@@ -14,13 +15,18 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, inspect as sqlalchemy_inspect
 from core.database import get_db
 from core.templates import templates
+from core.utils.export_helper import DataExporter
 from models.user import User
 from models.customer import Customer
 from models.customer_address import CustomerAddress
 from models.customer_contact import CustomerContact
 from models.customer_import_row import CustomerImportRow
 from models.customer_loan import CustomerLoan
+from models.customer_archive import CustomerArchive
 from models.activity_log import ActivityLog
+from models.field_setting import FieldSetting
+from core.utils.model_utils import model_to_dict
+from sqlalchemy.orm import joinedload, selectinload
 
 router = APIRouter(tags=["Customer Management"])
 CustomerImportPayload = namedtuple(
@@ -113,9 +119,14 @@ FIELD_PARSER_BY_TYPE = {
 
 CATEGORY_META = {
     "identity": {
-        "label": "Identitas Customer",
+        "label": "Identitas Utama",
         "icon": "bi-person-vcard",
-        "description": "Snapshot utama customer untuk identitas, status, dan pencarian dasar.",
+        "description": "Field yang Anda tandai sebagai prioritas untuk identitas dan pencarian dasar.",
+    },
+    "identity_other": {
+        "label": "Detail Identitas Lainnya",
+        "icon": "bi-person-badge",
+        "description": "Informasi identitas tambahan (opsional) yang tidak ditandai sebagai prioritas.",
     },
     "location": {
         "label": "Alamat & Lokasi",
@@ -140,148 +151,148 @@ CATEGORY_META = {
 }
 
 UPLOAD_FIELD_SPECS = [
-    ("identity", "full_name", "Nama Lengkap", True, "customer", "full_name", "string"),
-    ("identity", "nick_name", "Nama Panggilan", False, "customer", "nick_name", "string"),
-    ("identity", "customer_code", "Kode Customer", False, "customer", "customer_code", "string"),
-    ("identity", "external_customer_id", "External Customer ID", False, "customer", "external_customer_id", "string"),
-    ("identity", "platform_name", "Platform Customer", False, "customer", "platform_name", "string"),
-    ("identity", "partner_name", "Nama Partner", False, "customer", "partner_name", "string"),
-    ("identity", "nik", "NIK", False, "customer", "nik", "string"),
-    ("identity", "birth_date", "Tanggal Lahir", False, "customer", "birth_date", "date"),
-    ("identity", "gender", "Gender", False, "customer", "gender", "string"),
-    ("identity", "email", "Email Customer", False, "customer", "email", "string"),
-    ("identity", "primary_phone", "No. HP Utama", False, "customer", "primary_phone", "string"),
-    ("identity", "primary_city", "Kota Snapshot", False, "customer", "primary_city", "string"),
-    ("identity", "primary_address_summary", "Ringkasan Alamat Snapshot", False, "customer", "primary_address_summary", "string"),
-    ("identity", "status", "Status Customer", False, "customer", "status", "string"),
-    ("identity", "sub_status", "Sub Status Customer", False, "customer", "sub_status", "string"),
-    ("identity", "current_dpd", "Current DPD Snapshot", False, "customer", "current_dpd", "int"),
-    ("identity", "current_total_outstanding", "Current Total Outstanding Snapshot", False, "customer", "current_total_outstanding", "decimal"),
-    ("identity", "last_payment_date", "Tanggal Pembayaran Terakhir Snapshot", False, "customer", "last_payment_date", "date"),
-    ("identity", "last_payment_amount", "Nominal Pembayaran Terakhir Snapshot", False, "customer", "last_payment_amount", "decimal"),
-    ("identity", "customer_notes", "Catatan Customer", False, "customer", "notes", "string"),
-    ("location", "address_type", "Tipe Alamat", False, "address", "address_type", "string"),
-    ("location", "label", "Label Alamat", False, "address", "label", "string"),
-    ("location", "recipient_name", "Nama Penerima Alamat", False, "address", "recipient_name", "string"),
-    ("location", "full_address", "Alamat Lengkap", False, "address", "full_address", "string"),
-    ("location", "street", "Jalan", False, "address", "street", "string"),
-    ("location", "block", "Blok", False, "address", "block", "string"),
-    ("location", "house_number", "Nomor Rumah", False, "address", "house_number", "string"),
-    ("location", "rt", "RT", False, "address", "rt", "string"),
-    ("location", "rw", "RW", False, "address", "rw", "string"),
-    ("location", "kelurahan", "Kelurahan", False, "address", "kelurahan", "string"),
-    ("location", "kecamatan", "Kecamatan", False, "address", "kecamatan", "string"),
-    ("location", "city", "Kota Alamat", False, "address", "city", "string"),
-    ("location", "province", "Provinsi", False, "address", "province", "string"),
-    ("location", "postal_code", "Kode Pos", False, "address", "postal_code", "string"),
-    ("location", "country", "Negara", False, "address", "country", "string"),
-    ("location", "landmark", "Patokan", False, "address", "landmark", "string"),
-    ("location", "address_note", "Catatan Alamat", False, "address", "address_note", "string"),
-    ("location", "residence_status", "Status Tempat Tinggal", False, "address", "residence_status", "string"),
-    ("location", "is_primary", "Alamat Utama", False, "address", "is_primary", "int"),
-    ("location", "is_active", "Alamat Aktif", False, "address", "is_active", "int"),
-    ("location", "lat", "Latitude", False, "address", "lat", "float"),
-    ("location", "lng", "Longitude", False, "address", "lng", "float"),
-    ("location", "map_url", "Map URL", False, "address", "map_url", "string"),
-    ("location", "coordinate_source", "Sumber Koordinat", False, "address", "coordinate_source", "string"),
-    ("location", "coordinate_accuracy_meters", "Akurasi Koordinat (meter)", False, "address", "coordinate_accuracy_meters", "float"),
-    ("location", "is_location_verified", "Lokasi Terverifikasi", False, "address", "is_location_verified", "int"),
-    ("location", "raw_lat", "Raw Latitude", False, "address", "raw_lat", "string"),
-    ("location", "raw_lng", "Raw Longitude", False, "address", "raw_lng", "string"),
-    ("location", "raw_lat_lng", "Raw Latitude & Longitude", False, "address", "raw_lat_lng", "string"),
-    ("location", "raw_map_link", "Raw Map Link", False, "address", "raw_map_link", "string"),
-    ("loan", "is_current", "Loan Aktif Saat Ini", False, "loan", "is_current", "int"),
-    ("loan", "application_id", "Application ID", False, "loan", "application_id", "string"),
-    ("loan", "loan_number", "Loan Number", False, "loan", "loan_number", "string"),
-    ("loan", "contract_number", "Contract Number", False, "loan", "contract_number", "string"),
-    ("loan", "agreement_number", "Agreement Number", False, "loan", "agreement_number", "string"),
-    ("loan", "product_type", "Tipe Produk", False, "loan", "product_type", "string"),
-    ("loan", "product_name", "Nama Produk", False, "loan", "product_name", "string"),
-    ("loan", "loan_platform_name", "Platform Loan", False, "loan", "platform_name", "string"),
-    ("loan", "disbursement_date", "Tanggal Disbursement", False, "loan", "disbursement_date", "date"),
-    ("loan", "first_due_date", "Tanggal Jatuh Tempo Pertama", False, "loan", "first_due_date", "date"),
-    ("loan", "due_date", "Tanggal Jatuh Tempo", False, "loan", "due_date", "date"),
-    ("loan", "last_due_date", "Tanggal Jatuh Tempo Terakhir", False, "loan", "last_due_date", "date"),
-    ("loan", "maturity_date", "Tanggal Maturity", False, "loan", "maturity_date", "date"),
-    ("loan", "tenor", "Tenor", False, "loan", "tenor", "int"),
-    ("loan", "installment_number", "Installment Number", False, "loan", "installment_number", "int"),
-    ("loan", "remaining_installment_count", "Sisa Cicilan", False, "loan", "remaining_installment_count", "int"),
-    ("loan", "payment_frequency", "Frekuensi Pembayaran", False, "loan", "payment_frequency", "string"),
-    ("loan", "loan_amount", "Loan Amount", False, "loan", "loan_amount", "decimal"),
-    ("loan", "principal_amount", "Principal Amount", False, "loan", "principal_amount", "decimal"),
-    ("loan", "interest_amount", "Interest Amount", False, "loan", "interest_amount", "decimal"),
-    ("loan", "admin_fee_amount", "Admin Fee Amount", False, "loan", "admin_fee_amount", "decimal"),
-    ("loan", "penalty_amount", "Penalty Amount", False, "loan", "penalty_amount", "decimal"),
-    ("loan", "insurance_fee_amount", "Insurance Fee Amount", False, "loan", "insurance_fee_amount", "decimal"),
-    ("loan", "other_fee_amount", "Other Fee Amount", False, "loan", "other_fee_amount", "decimal"),
-    ("loan", "installment_amount", "Installment Amount", False, "loan", "installment_amount", "decimal"),
-    ("loan", "outstanding_principal", "Outstanding Principal", False, "loan", "outstanding_principal", "decimal"),
-    ("loan", "outstanding_interest", "Outstanding Interest", False, "loan", "outstanding_interest", "decimal"),
-    ("loan", "outstanding_penalty", "Outstanding Penalty", False, "loan", "outstanding_penalty", "decimal"),
-    ("loan", "outstanding_fee", "Outstanding Fee", False, "loan", "outstanding_fee", "decimal"),
-    ("loan", "total_outstanding", "Total Outstanding", False, "loan", "total_outstanding", "decimal"),
-    ("loan", "remaining_balance", "Remaining Balance", False, "loan", "remaining_balance", "decimal"),
-    ("loan", "overdue_days", "Overdue Days", False, "loan", "overdue_days", "int"),
-    ("loan", "days_past_due", "Days Past Due", False, "loan", "days_past_due", "int"),
-    ("loan", "dpd_bucket", "DPD Bucket", False, "loan", "dpd_bucket", "string"),
-    ("loan", "aging_bucket", "Aging Bucket", False, "loan", "aging_bucket", "string"),
-    ("loan", "bucket_code", "Bucket Code", False, "loan", "bucket_code", "string"),
-    ("loan", "loan_status", "Loan Status", False, "loan", "loan_status", "string"),
-    ("loan", "billing_status", "Billing Status", False, "loan", "billing_status", "string"),
-    ("loan", "collection_stage", "Collection Stage", False, "loan", "collection_stage", "string"),
-    ("loan", "risk_segment", "Risk Segment", False, "loan", "risk_segment", "string"),
-    ("loan", "risk_score", "Risk Score", False, "loan", "risk_score", "string"),
-    ("loan", "loan_last_payment_date", "Tanggal Pembayaran Terakhir Loan", False, "loan", "last_payment_date", "date"),
-    ("loan", "loan_last_payment_amount", "Nominal Pembayaran Terakhir Loan", False, "loan", "last_payment_amount", "decimal"),
-    ("loan", "last_payment_channel", "Channel Pembayaran Terakhir", False, "loan", "last_payment_channel", "string"),
-    ("loan", "last_payment_reference", "Referensi Pembayaran Terakhir", False, "loan", "last_payment_reference", "string"),
-    ("loan", "paid_amount_total", "Total Paid Amount", False, "loan", "paid_amount_total", "decimal"),
-    ("loan", "payment_status", "Payment Status", False, "loan", "payment_status", "string"),
-    ("loan", "promise_to_pay_date", "Tanggal Promise To Pay", False, "loan", "promise_to_pay_date", "date"),
-    ("loan", "promise_to_pay_amount", "Nominal Promise To Pay", False, "loan", "promise_to_pay_amount", "decimal"),
-    ("loan", "promise_to_pay_status", "Status Promise To Pay", False, "loan", "promise_to_pay_status", "string"),
-    ("loan", "broken_ptp_count", "Broken PTP Count", False, "loan", "broken_ptp_count", "int"),
-    ("loan", "settlement_offer_amount", "Settlement Offer Amount", False, "loan", "settlement_offer_amount", "decimal"),
-    ("loan", "settlement_expiry_date", "Settlement Expiry Date", False, "loan", "settlement_expiry_date", "date"),
-    ("loan", "minimum_payment_amount", "Minimum Payment Amount", False, "loan", "minimum_payment_amount", "decimal"),
-    ("contact", "contact_type", "Tipe Kontak", False, "contact", "contact_type", "string"),
-    ("contact", "contact_role", "Peran Kontak", False, "contact", "contact_role", "string"),
-    ("contact", "contact_name", "Nama Kontak", False, "contact", "name", "string"),
-    ("contact", "relationship_label", "Relationship", False, "contact", "relationship_label", "string"),
-    ("contact", "contact_phone_number", "No. HP Kontak", False, "contact", "phone_number", "string"),
-    ("contact", "contact_email", "Email Kontak", False, "contact", "email", "string"),
-    ("contact", "contact_is_primary", "Kontak Utama", False, "contact", "is_primary", "int"),
-    ("contact", "priority_order", "Priority Order", False, "contact", "priority_order", "int"),
-    ("contact", "is_whatsapp", "Nomor WhatsApp", False, "contact", "is_whatsapp", "int"),
-    ("contact", "contact_is_active", "Kontak Aktif", False, "contact", "is_active", "int"),
-    ("contact", "is_verified", "Kontak Terverifikasi", False, "contact", "is_verified", "int"),
-    ("contact", "is_valid", "Kontak Valid", False, "contact", "is_valid", "int"),
-    ("contact", "verification_source", "Sumber Verifikasi", False, "contact", "verification_source", "string"),
-    ("contact", "contact_notes", "Catatan Kontak", False, "contact", "notes", "string"),
-    ("import_meta", "source_partner_name", "Source Partner Name", False, "import_row", "source_partner_name", "string"),
-    ("import_meta", "source_partner_code", "Source Partner Code", False, "import_row", "source_partner_code", "string"),
-    ("import_meta", "source_file_name", "Source File Name", False, "import_row", "source_file_name", "string"),
-    ("import_meta", "source_sheet_name", "Source Sheet Name", False, "import_row", "source_sheet_name", "string"),
-    ("import_meta", "source_row_number", "Source Row Number", False, "import_row", "source_row_number", "int"),
-    ("import_meta", "mapping_profile_name", "Mapping Profile Name", False, "import_row", "mapping_profile_name", "string"),
-    ("import_meta", "import_version", "Import Version", False, "import_row", "import_version", "string"),
-    ("import_meta", "import_status", "Import Status", False, "import_row", "import_status", "string"),
-    ("import_meta", "import_error_flag", "Import Error Flag", False, "import_row", "import_error_flag", "int"),
-    ("import_meta", "import_error_message", "Import Error Message", False, "import_row", "import_error_message", "string"),
-    ("import_meta", "raw_customer_name", "Raw Customer Name", False, "import_row", "raw_customer_name", "string"),
-    ("import_meta", "raw_nik", "Raw NIK", False, "import_row", "raw_nik", "string"),
-    ("import_meta", "raw_phone", "Raw Phone", False, "import_row", "raw_phone", "string"),
-    ("import_meta", "raw_phone_2", "Raw Phone 2", False, "import_row", "raw_phone_2", "string"),
-    ("import_meta", "raw_address", "Raw Address", False, "import_row", "raw_address", "string"),
-    ("import_meta", "raw_city", "Raw City", False, "import_row", "raw_city", "string"),
-    ("import_meta", "raw_due_date", "Raw Due Date", False, "import_row", "raw_due_date", "string"),
-    ("import_meta", "raw_disbursement_date", "Raw Disbursement Date", False, "import_row", "raw_disbursement_date", "string"),
-    ("import_meta", "raw_loan_amount", "Raw Loan Amount", False, "import_row", "raw_loan_amount", "string"),
-    ("import_meta", "raw_installment_amount", "Raw Installment Amount", False, "import_row", "raw_installment_amount", "string"),
-    ("import_meta", "raw_outstanding_amount", "Raw Outstanding Amount", False, "import_row", "raw_outstanding_amount", "string"),
-    ("import_meta", "raw_overdue_days", "Raw Overdue Days", False, "import_row", "raw_overdue_days", "string"),
-    ("import_meta", "raw_platform_name", "Raw Platform Name", False, "import_row", "raw_platform_name", "string"),
-    ("import_meta", "raw_status", "Raw Status", False, "import_row", "raw_status", "string"),
+    ("identity", "full_name", "Nama Lengkap", True, "customer", "full_name", "string", "Rahman Maulana"),
+    ("identity", "nick_name", "Nama Panggilan", False, "customer", "nick_name", "string", "Rahman"),
+    ("identity", "customer_code", "Kode Customer", False, "customer", "customer_code", "string", "CUST-001"),
+    ("identity", "external_customer_id", "External Customer ID", False, "customer", "external_customer_id", "string", "-"),
+    ("identity", "platform_name", "Platform Customer", False, "customer", "platform_name", "string", "-"),
+    ("identity", "partner_name", "Nama Partner", False, "customer", "partner_name", "string", "-"),
+    ("identity", "nik", "NIK", False, "customer", "nik", "string", "3201234567890001"),
+    ("identity", "birth_date", "Tanggal Lahir", False, "customer", "birth_date", "date", "1990-01-01"),
+    ("identity", "gender", "Gender", False, "customer", "gender", "string", "-"),
+    ("identity", "email", "Email Customer", False, "customer", "email", "string", "rahman@example.com"),
+    ("identity", "primary_phone", "No. HP Utama", False, "customer", "primary_phone", "string", "081234567890"),
+    ("identity", "primary_city", "Kota Snapshot", False, "customer", "primary_city", "string", "Jakarta Selatan"),
+    ("identity", "primary_address_summary", "Ringkasan Alamat Snapshot", False, "customer", "primary_address_summary", "string", "-"),
+    ("identity", "status", "Status Customer", False, "customer", "status", "string", "-"),
+    ("identity", "sub_status", "Sub Status Customer", False, "customer", "sub_status", "string", "-"),
+    ("identity", "current_dpd", "Current DPD Snapshot", False, "customer", "current_dpd", "int", "-"),
+    ("identity", "current_total_outstanding", "Current Total Outstanding Snapshot", False, "customer", "current_total_outstanding", "decimal", "-"),
+    ("identity", "last_payment_date", "Tanggal Pembayaran Terakhir Snapshot", False, "customer", "last_payment_date", "date", "-"),
+    ("identity", "last_payment_amount", "Nominal Pembayaran Terakhir Snapshot", False, "customer", "last_payment_amount", "decimal", "-"),
+    ("identity", "customer_notes", "Catatan Customer", False, "customer", "notes", "string", "-"),
+    ("location", "address_type", "Tipe Alamat", False, "address", "address_type", "string", "-"),
+    ("location", "label", "Label Alamat", False, "address", "label", "string", "-"),
+    ("location", "recipient_name", "Nama Penerima Alamat", False, "address", "recipient_name", "string", "-"),
+    ("location", "full_address", "Alamat Lengkap", False, "address", "full_address", "string", "Jl. Sudirman No. 123"),
+    ("location", "street", "Jalan", False, "address", "street", "string", "-"),
+    ("location", "block", "Blok", False, "address", "block", "string", "-"),
+    ("location", "house_number", "Nomor Rumah", False, "address", "house_number", "string", "-"),
+    ("location", "rt", "RT", False, "address", "rt", "string", "-"),
+    ("location", "rw", "RW", False, "address", "rw", "string", "-"),
+    ("location", "kelurahan", "Kelurahan", False, "address", "kelurahan", "string", "-"),
+    ("location", "kecamatan", "Kecamatan", False, "address", "kecamatan", "string", "-"),
+    ("location", "city", "Kota Alamat", False, "address", "city", "string", "Jakarta Selatan"),
+    ("location", "province", "Provinsi", False, "address", "province", "string", "DKI Jakarta"),
+    ("location", "postal_code", "Kode Pos", False, "address", "postal_code", "string", "-"),
+    ("location", "country", "Negara", False, "address", "country", "string", "-"),
+    ("location", "landmark", "Patokan", False, "address", "landmark", "string", "-"),
+    ("location", "address_note", "Catatan Alamat", False, "address", "address_note", "string", "-"),
+    ("location", "residence_status", "Status Tempat Tinggal", False, "address", "residence_status", "string", "-"),
+    ("location", "is_primary", "Alamat Utama", False, "address", "is_primary", "int", "-"),
+    ("location", "is_active", "Alamat Aktif", False, "address", "is_active", "int", "-"),
+    ("location", "lat", "Latitude", False, "address", "lat", "float", "-"),
+    ("location", "lng", "Longitude", False, "address", "lng", "float", "-"),
+    ("location", "map_url", "Map URL", False, "address", "map_url", "string", "-"),
+    ("location", "coordinate_source", "Sumber Koordinat", False, "address", "coordinate_source", "string", "-"),
+    ("location", "coordinate_accuracy_meters", "Akurasi Koordinat (meter)", False, "address", "coordinate_accuracy_meters", "float", "-"),
+    ("location", "is_location_verified", "Lokasi Terverifikasi", False, "address", "is_location_verified", "int", "-"),
+    ("location", "raw_lat", "Raw Latitude", False, "address", "raw_lat", "string", "-"),
+    ("location", "raw_lng", "Raw Longitude", False, "address", "raw_lng", "string", "-"),
+    ("location", "raw_lat_lng", "Raw Latitude & Longitude", False, "address", "raw_lat_lng", "string", "-"),
+    ("location", "raw_map_link", "Raw Map Link", False, "address", "raw_map_link", "string", "-"),
+    ("loan", "is_current", "Loan Aktif Saat Ini", False, "loan", "is_current", "int", "-"),
+    ("loan", "application_id", "Application ID", False, "loan", "application_id", "string", "-"),
+    ("loan", "loan_number", "Loan Number", False, "loan", "loan_number", "string", "LOAN-2024-001"),
+    ("loan", "contract_number", "Contract Number", False, "loan", "contract_number", "string", "-"),
+    ("loan", "agreement_number", "Agreement Number", False, "loan", "agreement_number", "string", "-"),
+    ("loan", "product_type", "Tipe Produk", False, "loan", "product_type", "string", "-"),
+    ("loan", "product_name", "Nama Produk", False, "loan", "product_name", "string", "-"),
+    ("loan", "loan_platform_name", "Platform Loan", False, "loan", "platform_name", "string", "-"),
+    ("loan", "disbursement_date", "Tanggal Disbursement", False, "loan", "disbursement_date", "date", "-"),
+    ("loan", "first_due_date", "Tanggal Jatuh Tempo Pertama", False, "loan", "first_due_date", "date", "-"),
+    ("loan", "due_date", "Tanggal Jatuh Tempo", False, "loan", "due_date", "date", "-"),
+    ("loan", "last_due_date", "Tanggal Jatuh Tempo Terakhir", False, "loan", "last_due_date", "date", "-"),
+    ("loan", "maturity_date", "Tanggal Maturity", False, "loan", "maturity_date", "date", "-"),
+    ("loan", "tenor", "Tenor", False, "loan", "tenor", "int", "-"),
+    ("loan", "installment_number", "Installment Number", False, "loan", "installment_number", "int", "-"),
+    ("loan", "remaining_installment_count", "Sisa Cicilan", False, "loan", "remaining_installment_count", "int", "-"),
+    ("loan", "payment_frequency", "Frekuensi Pembayaran", False, "loan", "payment_frequency", "string", "-"),
+    ("loan", "loan_amount", "Loan Amount", False, "loan", "loan_amount", "decimal", "5,000,000"),
+    ("loan", "principal_amount", "Principal Amount", False, "loan", "principal_amount", "decimal", "-"),
+    ("loan", "interest_amount", "Interest Amount", False, "loan", "interest_amount", "decimal", "-"),
+    ("loan", "admin_fee_amount", "Admin Fee Amount", False, "loan", "admin_fee_amount", "decimal", "-"),
+    ("loan", "penalty_amount", "Penalty Amount", False, "loan", "penalty_amount", "decimal", "-"),
+    ("loan", "insurance_fee_amount", "Insurance Fee Amount", False, "loan", "insurance_fee_amount", "decimal", "-"),
+    ("loan", "other_fee_amount", "Other Fee Amount", False, "loan", "other_fee_amount", "decimal", "-"),
+    ("loan", "installment_amount", "Installment Amount", False, "loan", "installment_amount", "decimal", "-"),
+    ("loan", "outstanding_principal", "Outstanding Principal", False, "loan", "outstanding_principal", "decimal", "-"),
+    ("loan", "outstanding_interest", "Outstanding Interest", False, "loan", "outstanding_interest", "decimal", "-"),
+    ("loan", "outstanding_penalty", "Outstanding Penalty", False, "loan", "outstanding_penalty", "decimal", "-"),
+    ("loan", "outstanding_fee", "Outstanding Fee", False, "loan", "outstanding_fee", "decimal", "-"),
+    ("loan", "total_outstanding", "Total Outstanding", False, "loan", "total_outstanding", "decimal", "5,150,000"),
+    ("loan", "remaining_balance", "Remaining Balance", False, "loan", "remaining_balance", "decimal", "-"),
+    ("loan", "overdue_days", "Overdue Days", False, "loan", "overdue_days", "int", "15"),
+    ("loan", "days_past_due", "Days Past Due", False, "loan", "days_past_due", "int", "-"),
+    ("loan", "dpd_bucket", "DPD Bucket", False, "loan", "dpd_bucket", "string", "-"),
+    ("loan", "aging_bucket", "Aging Bucket", False, "loan", "aging_bucket", "string", "-"),
+    ("loan", "bucket_code", "Bucket Code", False, "loan", "bucket_code", "string", "-"),
+    ("loan", "loan_status", "Loan Status", False, "loan", "loan_status", "string", "-"),
+    ("loan", "billing_status", "Billing Status", False, "loan", "billing_status", "string", "-"),
+    ("loan", "collection_stage", "Collection Stage", False, "loan", "collection_stage", "string", "-"),
+    ("loan", "risk_segment", "Risk Segment", False, "loan", "risk_segment", "string", "-"),
+    ("loan", "risk_score", "Risk Score", False, "loan", "risk_score", "string", "-"),
+    ("loan", "loan_last_payment_date", "Tanggal Pembayaran Terakhir Loan", False, "loan", "last_payment_date", "date", "-"),
+    ("loan", "loan_last_payment_amount", "Nominal Pembayaran Terakhir Loan", False, "loan", "last_payment_amount", "decimal", "-"),
+    ("loan", "last_payment_channel", "Channel Pembayaran Terakhir", False, "loan", "last_payment_channel", "string", "-"),
+    ("loan", "last_payment_reference", "Referensi Pembayaran Terakhir", False, "loan", "last_payment_reference", "string", "-"),
+    ("loan", "paid_amount_total", "Total Paid Amount", False, "loan", "paid_amount_total", "decimal", "-"),
+    ("loan", "payment_status", "Payment Status", False, "loan", "payment_status", "string", "-"),
+    ("loan", "promise_to_pay_date", "Tanggal Promise To Pay", False, "loan", "promise_to_pay_date", "date", "-"),
+    ("loan", "promise_to_pay_amount", "Nominal Promise To Pay", False, "loan", "promise_to_pay_amount", "decimal", "-"),
+    ("loan", "promise_to_pay_status", "Status Promise To Pay", False, "loan", "promise_to_pay_status", "string", "-"),
+    ("loan", "broken_ptp_count", "Broken PTP Count", False, "loan", "broken_ptp_count", "int", "-"),
+    ("loan", "settlement_offer_amount", "Settlement Offer Amount", False, "loan", "settlement_offer_amount", "decimal", "-"),
+    ("loan", "settlement_expiry_date", "Settlement Expiry Date", False, "loan", "settlement_expiry_date", "date", "-"),
+    ("loan", "minimum_payment_amount", "Minimum Payment Amount", False, "loan", "minimum_payment_amount", "decimal", "-"),
+    ("contact", "contact_type", "Tipe Kontak", False, "contact", "contact_type", "string", "-"),
+    ("contact", "contact_role", "Peran Kontak", False, "contact", "contact_role", "string", "-"),
+    ("contact", "contact_name", "Nama Kontak", False, "contact", "name", "string", "Siti Aminah"),
+    ("contact", "relationship_label", "Relationship", False, "contact", "relationship_label", "string", "Orang Tua"),
+    ("contact", "contact_phone_number", "No. HP Kontak", False, "contact", "phone_number", "string", "089876543210"),
+    ("contact", "contact_email", "Email Kontak", False, "contact", "email", "string", "-"),
+    ("contact", "contact_is_primary", "Kontak Utama", False, "contact", "is_primary", "int", "-"),
+    ("contact", "priority_order", "Priority Order", False, "contact", "priority_order", "int", "-"),
+    ("contact", "is_whatsapp", "Nomor WhatsApp", False, "contact", "is_whatsapp", "int", "-"),
+    ("contact", "contact_is_active", "Kontak Aktif", False, "contact", "is_active", "int", "-"),
+    ("contact", "is_verified", "Kontak Terverifikasi", False, "contact", "is_verified", "int", "-"),
+    ("contact", "is_valid", "Kontak Valid", False, "contact", "is_valid", "int", "-"),
+    ("contact", "verification_source", "Sumber Verifikasi", False, "contact", "verification_source", "string", "-"),
+    ("contact", "contact_notes", "Catatan Kontak", False, "contact", "notes", "string", "-"),
+    ("import_meta", "source_partner_name", "Source Partner Name", False, "import_row", "source_partner_name", "string", "-"),
+    ("import_meta", "source_partner_code", "Source Partner Code", False, "import_row", "source_partner_code", "string", "-"),
+    ("import_meta", "source_file_name", "Source File Name", False, "import_row", "source_file_name", "string", "-"),
+    ("import_meta", "source_sheet_name", "Source Sheet Name", False, "import_row", "source_sheet_name", "string", "-"),
+    ("import_meta", "source_row_number", "Source Row Number", False, "import_row", "source_row_number", "int", "-"),
+    ("import_meta", "mapping_profile_name", "Mapping Profile Name", False, "import_row", "mapping_profile_name", "string", "-"),
+    ("import_meta", "import_version", "Import Version", False, "import_row", "import_version", "string", "-"),
+    ("import_meta", "import_status", "Import Status", False, "import_row", "import_status", "string", "-"),
+    ("import_meta", "import_error_flag", "Import Error Flag", False, "import_row", "import_error_flag", "int", "-"),
+    ("import_meta", "import_error_message", "Import Error Message", False, "import_row", "import_error_message", "string", "-"),
+    ("import_meta", "raw_customer_name", "Raw Customer Name", False, "import_row", "raw_customer_name", "string", "-"),
+    ("import_meta", "raw_nik", "Raw NIK", False, "import_row", "raw_nik", "string", "-"),
+    ("import_meta", "raw_phone", "Raw Phone", False, "import_row", "raw_phone", "string", "-"),
+    ("import_meta", "raw_phone_2", "Raw Phone 2", False, "import_row", "raw_phone_2", "string", "-"),
+    ("import_meta", "raw_address", "Raw Address", False, "import_row", "raw_address", "string", "-"),
+    ("import_meta", "raw_city", "Raw City", False, "import_row", "raw_city", "string", "-"),
+    ("import_meta", "raw_due_date", "Raw Due Date", False, "import_row", "raw_due_date", "string", "-"),
+    ("import_meta", "raw_disbursement_date", "Raw Disbursement Date", False, "import_row", "raw_disbursement_date", "string", "-"),
+    ("import_meta", "raw_loan_amount", "Raw Loan Amount", False, "import_row", "raw_loan_amount", "string", "-"),
+    ("import_meta", "raw_installment_amount", "Raw Installment Amount", False, "import_row", "raw_installment_amount", "string", "-"),
+    ("import_meta", "raw_outstanding_amount", "Raw Outstanding Amount", False, "import_row", "raw_outstanding_amount", "string", "-"),
+    ("import_meta", "raw_overdue_days", "Raw Overdue Days", False, "import_row", "raw_overdue_days", "string", "-"),
+    ("import_meta", "raw_platform_name", "Raw Platform Name", False, "import_row", "raw_platform_name", "string", "-"),
+    ("import_meta", "raw_status", "Raw Status", False, "import_row", "raw_status", "string", "-"),
 ]
 
 UPLOAD_FIELD_DEFINITIONS = [
@@ -293,8 +304,9 @@ UPLOAD_FIELD_DEFINITIONS = [
         "target": target,
         "attr": attr,
         "type": field_type,
+        "example": example,
     }
-    for category, key, label, required, target, attr, field_type in UPLOAD_FIELD_SPECS
+    for category, key, label, required, target, attr, field_type, example in UPLOAD_FIELD_SPECS
 ]
 
 FIELD_DEFINITION_BY_KEY = {field["key"]: field for field in UPLOAD_FIELD_DEFINITIONS}
@@ -407,21 +419,60 @@ def get_runtime_customer_load_attrs(runtime_columns_by_target):
     return attrs
 
 
-def build_category_groups(field_definitions=None):
+from models.field_category import FieldCategory
+
+def build_category_groups(db: Session = None, field_definitions=None):
     field_definitions = field_definitions or UPLOAD_FIELD_DEFINITIONS
+    
+    if not db:
+        return []
+        
+    db_categories = db.query(FieldCategory).order_by(FieldCategory.is_system.desc(), FieldCategory.id).all()
+    settings_db = db.query(FieldSetting).all()
+    settings_map = {s.field_key: s for s in settings_db}
+
     groups = []
-    for category_key, meta in CATEGORY_META.items():
-        groups.append(
-            {
-                "key": category_key,
-                "label": meta["label"],
-                "icon": meta["icon"],
-                "description": meta["description"],
-                "fields": [
-                    field for field in field_definitions if field["category"] == category_key
-                ],
-            }
-        )
+    assigned_field_keys = set()
+    
+    # 1. Process Defined Categories
+    for cat in db_categories:
+        group_fields = []
+        for field in field_definitions:
+            key = field["key"]
+            setting = settings_map.get(key)
+            assigned_cat_id = setting.category_id if setting else None
+            
+            # Logic:
+            # - If assigned_cat_id matches cat.id, it belongs to this group
+            if assigned_cat_id == cat.id:
+                group_fields.append(field)
+                assigned_field_keys.add(key)
+        
+        # We always add Identity category (it's the left column)
+        # For others, only add if they have fields OR if they were explicitly created by user (not system)
+        if cat.key == "identity" or group_fields or not cat.is_system:
+            groups.append({
+                "id": cat.id,
+                "key": cat.key,
+                "label": cat.label,
+                "icon": cat.icon,
+                "description": cat.description,
+                "fields": group_fields,
+            })
+
+    # 2. Collect Unassigned Fields (The ones that "disappeared")
+    unassigned_fields = [f for f in field_definitions if f["key"] not in assigned_field_keys]
+    
+    if unassigned_fields:
+        groups.append({
+            "id": 0,
+            "key": "uncategorized",
+            "label": "Lainnya (Belum Terkategori)",
+            "icon": "bi-question-circle",
+            "description": "Field yang kategorinya telah dihapus atau belum diatur ulang di menu Settings.",
+            "fields": unassigned_fields,
+        })
+            
     return groups
 
 
@@ -653,6 +704,16 @@ def customer_list_batches(
     success = request.query_params.get("success")
     error = request.query_params.get("error")
 
+    # Fetch priority fields for guidance
+    settings_db = db.query(FieldSetting).filter(FieldSetting.is_priority == True).all()
+    priority_keys = {s.field_key for s in settings_db}
+    
+    # Fallback to defaults if no settings exist yet
+    if not settings_db:
+        priority_keys = {"full_name", "nik", "primary_phone", "loan_number", "total_outstanding", "overdue_days"}
+        
+    priority_fields = [f for f in UPLOAD_FIELD_DEFINITIONS if f["key"] in priority_keys]
+
     return templates.TemplateResponse(
         request,
         "customers/batches.html",
@@ -660,6 +721,7 @@ def customer_list_batches(
             "current_user": current_user,
             "batches": batches_query,
             "agents": agents,
+            "priority_fields": priority_fields,
             "success": success,
             "error": error,
         },
@@ -793,7 +855,19 @@ async def upload_customers(
 
         runtime_columns_by_target = get_runtime_columns_by_target(db)
         expected_fields = filter_field_definitions_by_runtime_columns(runtime_columns_by_target)
-        category_groups = build_category_groups(expected_fields)
+        category_groups = build_category_groups(db, expected_fields)
+
+        # Basic Auto-matching logic
+        suggested_mappings = {}
+        for field in expected_fields:
+            field_label = field["label"].lower().replace(".", "").strip()
+            field_key = field["key"].lower().replace("_", " ").strip()
+            
+            for i, h in enumerate(headers):
+                h_clean = h.lower().strip()
+                if h_clean == field_label or h_clean == field_key or h_clean.replace(" ", "") == field_key.replace(" ", ""):
+                    suggested_mappings[field["key"]] = i
+                    break
 
         return templates.TemplateResponse(
             request,
@@ -803,6 +877,7 @@ async def upload_customers(
                 "headers": headers,
                 "expected_fields": expected_fields,
                 "category_groups": category_groups,
+                "suggested_mappings": suggested_mappings,
                 "temp_filename": temp_filename,
                 "agent_id": agent_id or "",
             },
@@ -952,6 +1027,13 @@ async def process_customers_upload(
                     .values(**customer_update)
                 )
             count += 1
+            
+            # Periodically check for disconnection and yield to event loop
+            if count % 10 == 0:
+                if await request.is_disconnected():
+                    db.rollback()
+                    return RedirectResponse("/customers", status_code=302)
+                await asyncio.sleep(0.01) # Breathe for event loop
 
         # Cleanup
         try:
@@ -1074,34 +1156,176 @@ def bulk_delete_customers(
 
 
 @router.post("/customers/batch/{batch_code}/delete")
-def delete_batch(
+async def delete_batch(
     request: Request,
     batch_code: str,
     db: Session = Depends(get_db),
 ):
-    """Delete all customers in a batch."""
+    """Delete all customers in a batch using bulk SQL for speed.
+    
+    Strategy:
+    1. Bulk INSERT INTO customer_archives SELECT ... (single SQL)
+    2. Bulk DELETE child tables by customer_id subquery (single SQL each)
+    3. Bulk DELETE customers (single SQL)
+    
+    This replaces the old O(N) ORM loop which loaded every customer + relationships
+    into Python and did individual db.add(archive) + db.delete(customer) per row.
+    """
+    from fastapi.responses import JSONResponse
+    from sqlalchemy import text
+    import json
+
     current_user = _require_admin(request, db)
     if not current_user:
-        return RedirectResponse("/login", status_code=302)
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
-    updated = (
-        db.query(Customer)
-        .filter(Customer.upload_batch == batch_code)
-        .update({"is_deleted": 1}, synchronize_session="fetch")
-    )
+    # 1) Quick count check
+    count = db.query(func.count(Customer.id)).filter(Customer.upload_batch == batch_code).scalar() or 0
 
-    log = ActivityLog(
-        user_id=current_user.id,
-        action="delete_batch",
-        detail=f"Hapus batch (soft delete) {batch_code} ({updated} customers)",
-    )
-    db.add(log)
-    db.commit()
+    if count == 0:
+        return JSONResponse(
+            {"error": f"Batch {batch_code} tidak ditemukan atau kosong"},
+            status_code=404,
+        )
 
-    return RedirectResponse(
-        f"/customers?success={quote(f'Batch {batch_code} dan {updated} data di dalamnya berhasil dihapus')}",
-        status_code=302,
-    )
+    try:
+        # Helper: yield to event loop and check if client disconnected (user clicked Batal)
+        async def _check_cancelled():
+            await asyncio.sleep(0)  # yield so event loop can process the disconnect
+            if await request.is_disconnected():
+                raise asyncio.CancelledError("Client disconnected")
+
+        # 2) Bulk archive: INSERT INTO customer_archives SELECT ... with JSON aggregation
+        #    We use MySQL JSON_OBJECT + subqueries to build full_data_json in a single statement.
+        archive_sql = text("""
+            INSERT INTO customer_archives
+                (original_customer_id, full_name, nik, primary_phone, upload_batch,
+                 loan_number, total_outstanding, overdue_days, status,
+                 deleted_by_id, deleted_at, full_data_json)
+            SELECT
+                c.id,
+                c.full_name,
+                c.nik,
+                c.primary_phone,
+                c.upload_batch,
+                cl.loan_number,
+                c.current_total_outstanding,
+                c.current_dpd,
+                c.status,
+                :deleted_by_id,
+                NOW(),
+                JSON_OBJECT(
+                    'id', c.id,
+                    'full_name', c.full_name,
+                    'nik', c.nik,
+                    'primary_phone', c.primary_phone,
+                    'primary_city', c.primary_city,
+                    'status', c.status,
+                    'sub_status', c.sub_status,
+                    'upload_batch', c.upload_batch,
+                    'current_dpd', c.current_dpd,
+                    'current_total_outstanding', CAST(c.current_total_outstanding AS CHAR),
+                    'platform_name', c.platform_name,
+                    'partner_name', c.partner_name,
+                    'assigned_agent_id', c.assigned_agent_id,
+                    'created_at', DATE_FORMAT(c.created_at, '%Y-%m-%dT%H:%i:%s'),
+                    'loan_number', cl.loan_number,
+                    'loan_amount', CAST(cl.loan_amount AS CHAR),
+                    'total_outstanding', CAST(cl.total_outstanding AS CHAR),
+                    'overdue_days', cl.overdue_days,
+                    'due_date', DATE_FORMAT(cl.due_date, '%Y-%m-%d'),
+                    'disbursement_date', DATE_FORMAT(cl.disbursement_date, '%Y-%m-%d')
+                )
+            FROM customers c
+            LEFT JOIN customer_loans cl ON cl.id = c.current_loan_id
+            WHERE c.upload_batch = :batch_code
+        """)
+        db.execute(archive_sql, {"batch_code": batch_code, "deleted_by_id": current_user.id})
+        await _check_cancelled()
+
+        # 3) Bulk delete child tables (order matters for FK constraints)
+        #    Using subquery for customer IDs to avoid loading them into Python.
+        customer_id_subquery = "SELECT id FROM customers WHERE upload_batch = :batch_code"
+
+        # Delete collections
+        db.execute(
+            text(f"DELETE FROM collections WHERE customer_id IN ({customer_id_subquery})"),
+            {"batch_code": batch_code},
+        )
+        await _check_cancelled()
+
+        # Delete import rows
+        db.execute(
+            text(f"DELETE FROM customer_import_rows WHERE customer_id IN ({customer_id_subquery})"),
+            {"batch_code": batch_code},
+        )
+        await _check_cancelled()
+
+        # Delete contacts
+        db.execute(
+            text(f"DELETE FROM customer_contacts WHERE customer_id IN ({customer_id_subquery})"),
+            {"batch_code": batch_code},
+        )
+        await _check_cancelled()
+
+        # Delete addresses
+        db.execute(
+            text(f"DELETE FROM customer_addresses WHERE customer_id IN ({customer_id_subquery})"),
+            {"batch_code": batch_code},
+        )
+        await _check_cancelled()
+
+        # Delete loans (must be after clearing current_loan_id FK)
+        db.execute(
+            text(f"UPDATE customers SET current_loan_id = NULL WHERE upload_batch = :batch_code"),
+            {"batch_code": batch_code},
+        )
+        db.execute(
+            text(f"DELETE FROM customer_loans WHERE customer_id IN ({customer_id_subquery})"),
+            {"batch_code": batch_code},
+        )
+        await _check_cancelled()
+
+        # Nullify VA requests (customer_id is nullable, preserve VA history)
+        db.execute(
+            text(f"UPDATE va_requests SET customer_id = NULL WHERE customer_id IN ({customer_id_subquery})"),
+            {"batch_code": batch_code},
+        )
+        await _check_cancelled()
+
+        # 4) Finally delete customers themselves
+        db.execute(
+            text("DELETE FROM customers WHERE upload_batch = :batch_code"),
+            {"batch_code": batch_code},
+        )
+
+        # 5) Activity log
+        log = ActivityLog(
+            user_id=current_user.id,
+            action="delete_batch_archive",
+            detail=f"Hapus batch (move-to-archive) {batch_code} ({count} customers)",
+        )
+        db.add(log)
+        db.commit()
+
+        return JSONResponse({
+            "success": True,
+            "message": f"Batch {batch_code} dan {count} data di dalamnya berhasil diarsipkan dan dihapus dari tabel utama",
+            "count": count,
+        })
+
+    except asyncio.CancelledError:
+        # User clicked Batal — rollback everything so no partial data is left
+        db.rollback()
+        return JSONResponse({"error": "Dibatalkan oleh pengguna"}, status_code=499)
+
+    except Exception as e:
+        db.rollback()
+        return JSONResponse(
+            {"error": f"Gagal menghapus batch: {str(e)}"},
+            status_code=500,
+        )
+
 
 
 @router.post("/customers/{customer_id}/delete")
@@ -1110,17 +1334,66 @@ def delete_customer(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Delete a customer."""
+    """Delete a customer by moving them to archive and hard-deleting."""
     current_user = _require_admin(request, db)
     if not current_user:
         return RedirectResponse("/login", status_code=302)
 
-    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    customer = (
+        db.query(Customer)
+        .options(
+            joinedload(Customer.current_loan),
+            selectinload(Customer.addresses),
+            selectinload(Customer.contacts),
+        )
+        .filter(Customer.id == customer_id)
+        .first()
+    )
+    
     if not customer:
         return RedirectResponse(
             f"/customers?error={quote('Customer tidak ditemukan')}",
             status_code=302,
         )
+
+    name = customer.full_name
+    full_data = model_to_dict(customer, include_relationships=True)
+    
+    archive = CustomerArchive(
+        original_customer_id=customer.id,
+        full_name=customer.full_name,
+        nik=customer.nik,
+        primary_phone=customer.primary_phone,
+        upload_batch=customer.upload_batch,
+        loan_number=customer.current_loan.loan_number if customer.current_loan else None,
+        total_outstanding=customer.current_total_outstanding,
+        overdue_days=customer.current_dpd,
+        status=customer.status,
+        deleted_by_id=current_user.id,
+        full_data_json=full_data
+    )
+    db.add(archive)
+    
+    # Hard delete original
+    db.delete(customer)
+
+    log = ActivityLog(
+        user_id=current_user.id,
+        action="delete_customer_archive",
+        detail=f"Hapus customer (move-to-archive): {name}",
+    )
+    db.add(log)
+    db.commit()
+
+    referer = request.headers.get("referer") or "/customers"
+    if "?" in referer:
+        referer = referer.split("?")[0]
+
+    return RedirectResponse(
+        f"{referer}?success={quote(f'Customer {name} berhasil diarsipkan dan dihapus dari tabel utama')}",
+        status_code=302,
+    )
+
 
     name = customer.full_name
     customer.is_deleted = 1
@@ -1140,4 +1413,62 @@ def delete_customer(
     return RedirectResponse(
         f"{referer}?success={quote(f'Customer {name} berhasil dihapus')}",
         status_code=302,
+    )
+
+
+@router.get("/customers/export")
+def export_customers(
+    request: Request,
+    batch_code: str = Query(default=None),
+    status: str = Query(default=None),
+    agent_id: str = Query(default=None),
+    search: str = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    """Export customers to Excel with filters."""
+    current_user = _require_admin(request, db)
+    if not current_user:
+        return RedirectResponse("/login", status_code=302)
+
+    query = db.query(Customer).options(
+        joinedload(Customer.agent),
+        joinedload(Customer.current_loan),
+    ).filter(Customer.is_deleted == 0)
+
+    if batch_code:
+        if batch_code.lower() == "manual":
+            query = query.filter(Customer.upload_batch == None)
+        else:
+            query = query.filter(Customer.upload_batch == batch_code)
+
+    if status:
+        query = query.filter(Customer.status == status)
+    if agent_id and agent_id.isdigit():
+        query = query.filter(Customer.assigned_agent_id == int(agent_id))
+    if search:
+        query = query.filter(Customer.full_name.ilike(f"%{search}%"))
+
+    query = query.order_by(Customer.created_at.desc())
+
+    field_mappings = [
+        {"label": "ID", "attr": "id"},
+        {"label": "Nama Lengkap", "attr": "full_name"},
+        {"label": "No. HP", "attr": "primary_phone"},
+        {"label": "Kota", "attr": "primary_city"},
+        {"label": "Status", "attr": "status"},
+        {"label": "Sub Status", "attr": "sub_status"},
+        {"label": "Agent", "func": lambda x: x.agent.name if x.agent else "Belum Assign"},
+        {"label": "Platform", "attr": "platform_name"},
+        {"label": "Partner", "attr": "partner_name"},
+        {"label": "Current DPD", "attr": "current_dpd"},
+        {"label": "Outstanding", "attr": "current_total_outstanding"},
+        {"label": "Batch", "attr": "upload_batch"},
+        {"label": "Created At", "func": lambda x: DataExporter.format_datetime(x.created_at)},
+    ]
+
+    return DataExporter.export_to_excel(
+        query=query,
+        field_mappings=field_mappings,
+        filename_prefix=f"customers_{batch_code}" if batch_code else "customers_all",
+        sheet_title="Customers"
     )

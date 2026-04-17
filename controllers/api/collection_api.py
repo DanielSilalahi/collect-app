@@ -31,10 +31,14 @@ def create_collection(
     if not customer:
         raise HTTPException(status_code=404, detail="Customer tidak ditemukan")
 
-    # Validate status
-    valid_statuses = ["bayar", "janji_bayar", "tidak_ketemu"]
-    if payload.status not in valid_statuses:
-        raise HTTPException(status_code=400, detail=f"Status harus salah satu: {', '.join(valid_statuses)}")
+    # Validate status (allow any that exists and is active)
+    from models.visit_status import VisitStatus
+    status_exists = db.query(VisitStatus).filter(VisitStatus.key == payload.status, VisitStatus.is_active == True).first()
+    if not status_exists:
+        # Fallback for core backward compatibility if not seeded yet, but we seeded it
+        valid_defaults = ["bayar", "janji_bayar", "tidak_ketemu"]
+        if payload.status not in valid_defaults:
+            raise HTTPException(status_code=400, detail=f"Status '{payload.status}' tidak valid.")
 
     collection = Collection(
         customer_id=payload.customer_id,
@@ -56,7 +60,7 @@ def create_collection(
     log = ActivityLog(
         user_id=user.id,
         action="collection_update",
-        detail=f"Customer #{customer.id} ({customer.name}): {payload.status}",
+        detail=f"Customer #{customer.id} ({customer.full_name}): {payload.status}",
     )
     db.add(log)
     db.commit()

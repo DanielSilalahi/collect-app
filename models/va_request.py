@@ -7,7 +7,7 @@ class VaRequest(Base):
     __tablename__ = "va_requests"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True, index=True)
     agent_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     notes = Column(Text, nullable=True)
     status = Column(String(20), default="pending", index=True)  # pending | completed

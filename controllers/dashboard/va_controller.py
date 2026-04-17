@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 from core.database import get_db
 from core.templates import templates
+from core.utils.export_helper import DataExporter
 from models.user import User
 from models.customer import Customer
 from models.va_request import VaRequest
@@ -136,4 +137,50 @@ def create_va(
     return RedirectResponse(
         f"/va-requests?success={quote(f'VA {va_number} berhasil dibuat')}",
         status_code=302,
+    )
+
+
+@router.get("/va-requests/export")
+def export_va_requests(
+    request: Request,
+    status: str = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    """Export VA requests to Excel."""
+    current_user = _require_admin(request, db)
+    if not current_user:
+        return RedirectResponse("/login", status_code=302)
+
+    query = (
+        db.query(VaRequest)
+        .options(
+            joinedload(VaRequest.customer),
+            joinedload(VaRequest.agent),
+            joinedload(VaRequest.va_data),
+        )
+    )
+
+    if status:
+        query = query.filter(VaRequest.status == status)
+
+    query = query.order_by(VaRequest.created_at.desc())
+
+    field_mappings = [
+        {"label": "ID", "attr": "id"},
+        {"label": "Customer", "attr": "customer.full_name"},
+        {"label": "Agent", "attr": "agent.name"},
+        {"label": "Status", "attr": "status"},
+        {"label": "VA Number", "attr": "va_data.va_number"},
+        {"label": "Bank", "attr": "va_data.bank_name"},
+        {"label": "Amount Requested", "attr": "amount"},
+        {"label": "Amount Created", "attr": "va_data.amount"},
+        {"label": "Requested At", "func": lambda x: DataExporter.format_datetime(x.created_at)},
+        {"label": "Created At", "func": lambda x: DataExporter.format_datetime(x.va_data.created_at) if x.va_data else "-"},
+    ]
+
+    return DataExporter.export_to_excel(
+        query=query,
+        field_mappings=field_mappings,
+        filename_prefix="va_requests",
+        sheet_title="VA Requests"
     )

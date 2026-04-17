@@ -41,10 +41,15 @@
                 <div class="small text-uppercase fw-semibold text-primary mb-2">Format Didukung</div>
                 <h5 class="fw-bold mb-3">Header bisa fleksibel, mapping-nya dipilih di langkah berikut.</h5>
                 <ul class="list-unstyled small text-muted mb-0">
-                    <li class="mb-2"><i class="bi bi-check2-circle text-success me-2"></i>Nama nasabah dan nomor HP utama</li>
-                    <li class="mb-2"><i class="bi bi-check2-circle text-success me-2"></i>Alamat, kota, dan koordinat gabungan</li>
-                    <li class="mb-2"><i class="bi bi-check2-circle text-success me-2"></i>Loan number, OS, DPD, dan due date</li>
-                    <li><i class="bi bi-check2-circle text-success me-2"></i>Kontak darurat untuk follow-up lapangan</li>
+                    {% for field in priority_fields[:8] %}
+                    <li class="mb-2">
+                        <i class="bi bi-check2-circle text-success me-2"></i>
+                        {{ field.label }} <span class="opacity-75">(e.g. {{ field.example }})</span>
+                    </li>
+                    {% endfor %}
+                    {% if priority_fields|length > 8 %}
+                    <li class="text-primary fw-semibold">+ {{ priority_fields|length - 8 }} field lainnya</li>
+                    {% endif %}
                 </ul>
             </div>
         </div>
@@ -79,7 +84,7 @@
             </thead>
             <tbody>
                 {% for b in batches %}
-                <tr>
+                <tr id="batch-row-{{ b.upload_batch }}">
                     <td>
                         <div class="fw-bold text-primary">{{ b.upload_batch if b.upload_batch else "Input Manual / Tanpa Batch" }}</div>
                         <div class="small text-muted">{{ "Dari file excel" if b.upload_batch else "Ditambahkan satu persatu / terlewat" }}</div>
@@ -94,11 +99,12 @@
                         <span class="small text-muted">{{ b.assigned_count }} / {{ b.total_customers }} Assigned</span>
                     </td>
                     <td class="text-end">
-                        <form method="POST" action="/customers/batch/{{ b.upload_batch }}/delete" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus seluruh batch {{ b.upload_batch }} beserta isinya?');">
-                            <button type="submit" class="btn btn-sm btn-outline-danger" {% if not b.upload_batch %}disabled title="Tidak bisa menghapus manual"{% endif %}>
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </form>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-danger"
+                                onclick="deleteBatch('{{ b.upload_batch }}', {{ b.total_customers }})"
+                                {% if not b.upload_batch %}disabled title="Tidak bisa menghapus manual"{% endif %}>
+                            <i class="bi bi-trash"></i>
+                        </button>
                         <a href="/customers/batch/{{ b.upload_batch if b.upload_batch else 'manual' }}" class="btn btn-sm btn-outline-primary ms-1">
                             Buka <i class="bi bi-arrow-right ms-1"></i>
                         </a>
@@ -121,7 +127,7 @@
                 <h5 class="modal-title"><i class="bi bi-upload me-2"></i>Upload Data Customer</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="/customers/upload" enctype="multipart/form-data">
+            <form id="uploadForm" method="POST" action="/customers/upload" enctype="multipart/form-data" data-loading-text="Mengunggah file Excel...">
                 <div class="modal-body">
                     <div class="rounded-4 border border-primary-subtle bg-primary-subtle bg-opacity-25 p-3 mb-3">
                         <div class="d-flex align-items-start gap-3">
@@ -149,10 +155,78 @@
                 </div>
                 <div class="modal-footer bg-light">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-success"><i class="bi bi-upload me-1"></i>Upload & Lanjut ke Mapping</button>
+                    <button type="submit" class="btn     btn-success" onclick="if(this.form.checkValidity()) setLoading(true, 'Mengunggah file Excel...', 'Membatalkan unggahan file...')"><i class="bi bi-upload me-1"></i>Upload & Lanjut ke Mapping</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Active AbortController for cancellable delete requests
+    let _deleteBatchController = null;
+
+    async function deleteBatch(batchCode, totalCustomers) {
+        if (!confirm(`Yakin ingin menghapus seluruh batch ${batchCode} beserta ${totalCustomers} data di dalamnya?`)) {
+            return;
+        }
+
+        // Show loading overlay
+        setLoading(true, `Menghapus & mengarsipkan ${totalCustomers} data batch...`, 'Membatalkan penghapusan batch...');
+
+        // Create a new AbortController so cancel button can abort instantly
+        _deleteBatchController = new AbortController();
+
+        try {
+            const response = await fetch(`/customers/batch/${encodeURIComponent(batchCode)}/delete`, {
+                method: 'POST',
+                signal: _deleteBatchController.signal,
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Fade out the row for instant visual feedback
+                const row = document.getElementById(`batch-row-${batchCode}`);
+                if (row) {
+                    row.style.transition = 'opacity 0.3s';
+                    row.style.opacity = '0';
+                }
+                // Redirect with success message
+                window.location.href = `/customers?success=${encodeURIComponent(data.message)}`;
+            } else {
+                setLoading(false);
+                alert(data.error || 'Terjadi kesalahan saat menghapus batch.');
+            }
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                // User clicked Batal — request was aborted instantly, no server-side effect
+                // (the DB transaction will be rolled back since the connection was dropped)
+                console.log('Delete batch cancelled by user.');
+            } else {
+                alert('Gagal menghapus batch: ' + err.message);
+            }
+            setLoading(false);
+        } finally {
+            _deleteBatchController = null;
+        }
+    }
+
+    // Override the global cancelLoading to also abort the delete fetch
+    const _originalCancelLoading = window.cancelLoading;
+    window.cancelLoading = function() {
+        if (_deleteBatchController) {
+            // Abort the fetch immediately — this is instant
+            _deleteBatchController.abort();
+            setLoading(false);
+            return;
+        }
+        // Fall back to original behavior for non-AJAX forms
+        if (typeof _originalCancelLoading === 'function') {
+            _originalCancelLoading();
+        }
+    };
+</script>
 {% endblock %}

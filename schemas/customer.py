@@ -1,12 +1,10 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
-
-from pydantic import BaseModel, ConfigDict, Field
-
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 class CustomerResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: int
     full_name: str
@@ -21,6 +19,32 @@ class CustomerResponse(BaseModel):
     assigned_agent_id: Optional[int] = None
     created_at: Optional[datetime] = None
 
+    # Legacy fields for Mobile App compatibility
+    @computed_field
+    @property
+    def name(self) -> str:
+        return self.full_name
+
+    @computed_field
+    @property
+    def phone(self) -> Optional[str]:
+        return self.primary_phone
+
+    @computed_field
+    @property
+    def address(self) -> Optional[str]:
+        return self.primary_address_summary or self.primary_city
+
+    @computed_field
+    @property
+    def outstanding_amount(self) -> Optional[float]:
+        return float(self.current_total_outstanding) if self.current_total_outstanding else 0.0
+
+    @computed_field
+    @property
+    def overdue_days(self) -> int:
+        return self.current_dpd or 0
+
 
 class CustomerLoanBriefResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -30,6 +54,11 @@ class CustomerLoanBriefResponse(BaseModel):
     contract_number: Optional[str] = None
     total_outstanding: Optional[Decimal] = None
     overdue_days: Optional[int] = None
+
+    @computed_field
+    @property
+    def outstanding_amount(self) -> Optional[float]:
+        return float(self.total_outstanding) if self.total_outstanding else 0.0
 
 
 class CustomerContactResponse(BaseModel):

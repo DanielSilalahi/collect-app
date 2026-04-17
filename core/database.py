@@ -25,5 +25,5 @@ def get_db():
 
 def init_db():
     """Create all tables that don't exist yet."""
-    from models import activity_log, collection, customer, customer_address, customer_contact, customer_import_row, customer_loan, user, va_data, va_request  # noqa
+    from models import activity_log, collection, customer, customer_address, customer_contact, customer_import_row, customer_loan, user, va_data, va_request, customer_archive, field_setting, field_category  # noqa
     Base.metadata.create_all(engine, checkfirst=True)

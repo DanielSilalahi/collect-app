@@ -2,14 +2,14 @@ import math
 import io
 from datetime import datetime
 from fastapi import APIRouter, Depends, Request, Query
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from core.database import get_db
 from core.templates import templates
+from core.utils.export_helper import DataExporter
 from models.user import User
 from models.activity_log import ActivityLog
-import openpyxl
 import pytz
 
 router = APIRouter(tags=["Activity Logs"])
@@ -98,38 +98,20 @@ def export_activity(
     if user_id and user_id.isdigit():
         query = query.filter(ActivityLog.user_id == int(user_id))
 
-    logs = query.order_by(ActivityLog.timestamp.desc()).all()
+    query = query.order_by(ActivityLog.timestamp.desc())
 
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Activity Logs"
+    field_mappings = [
+        {"label": "ID", "attr": "id"},
+        {"label": "User", "func": lambda x: x.user.name if x.user else "System"},
+        {"label": "Action", "attr": "action"},
+        {"label": "Detail", "attr": "detail"},
+        {"label": "IP Address", "attr": "ip_address"},
+        {"label": "Timestamp", "func": lambda x: DataExporter.format_datetime(x.timestamp)},
+    ]
 
-    # Header
-    headers = ["No", "User", "Action", "Detail", "IP Address", "Timestamp"]
-    ws.append(headers)
-
-    jakarta = pytz.timezone("Asia/Jakarta")
-    for i, log in enumerate(logs, 1):
-        ts = log.timestamp
-        if ts:
-            ts = ts.strftime("%Y-%m-%d %H:%M:%S")
-        ws.append([
-            i,
-            log.user.name if log.user else "-",
-            log.action,
-            log.detail or "-",
-            log.ip_address or "-",
-            ts or "-",
-        ])
-
-    output = io.BytesIO()
-    wb.save(output)
-    output.seek(0)
-
-    filename = f"activity_logs_{datetime.now(jakarta).strftime('%Y%m%d_%H%M%S')}.xlsx"
-
-    return StreamingResponse(
-        output,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    return DataExporter.export_to_excel(
+        query=query,
+        field_mappings=field_mappings,
+        filename_prefix="activity_logs",
+        sheet_title="Activity Logs"
     )

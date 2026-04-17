@@ -64,7 +64,7 @@ def request_va(
     log = ActivityLog(
         user_id=user.id,
         action="request_va",
-        detail=f"VA request untuk customer #{customer.id} ({customer.name})",
+        detail=f"VA request untuk customer #{customer.id} ({customer.full_name})",
     )
     db.add(log)
     db.commit()
@@ -138,7 +138,7 @@ def get_pending_notifications(
         results.append({
             "id": req.id,
             "customer_id": req.customer_id,
-            "customer_name": req.customer.name if req.customer else "Nasabah",
+            "customer_name": req.customer.full_name if req.customer else "Nasabah",
             "va_number": req.va_data.va_number if req.va_data else None,
             "bank_name": req.va_data.bank_name if req.va_data else None,
         })

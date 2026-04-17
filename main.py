@@ -11,7 +11,7 @@ from core.templates import templates
 from models.user import User
 
 # Import API controllers
-from controllers.api import auth_api, customer_api, collection_api, va_api
+from controllers.api import auth_api, customer_api, collection_api, va_api, visit_status_api
 
 # Import dashboard controllers
 from controllers.dashboard import (
@@ -21,6 +21,8 @@ from controllers.dashboard import (
     va_controller,
     activity_controller,
     user_controller,
+    collection_controller,
+    setting_controller,
 )
 
 app = FastAPI(title="Collection System P2P", version="1.0.0", debug=True)
@@ -42,6 +44,7 @@ app.include_router(auth_api.router)
 app.include_router(customer_api.router)
 app.include_router(collection_api.router)
 app.include_router(va_api.router)
+app.include_router(visit_status_api.router)
 
 # Register dashboard routes
 app.include_router(auth_controller.router)
@@ -50,6 +53,8 @@ app.include_router(customer_controller.router)
 app.include_router(va_controller.router)
 app.include_router(activity_controller.router)
 app.include_router(user_controller.router)
+app.include_router(collection_controller.router)
+app.include_router(setting_controller.router)
 
 # 404 handler
 @app.exception_handler(404)

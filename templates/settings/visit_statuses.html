@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% set active_page = "settings" %}
+
+{% block title %}Visit Status Settings{% endblock %}
+{% block page_title %}Pengaturan Status Kunjungan{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col">
+        <h5 class="text-muted">Kelola opsi "Hasil Kunjungan" yang muncul di aplikasi mobile</h5>
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addStatusModal">
+            <i class="bi bi-plus-circle me-1"></i>Tambah Status
+        </button>
+    </div>
+</div>
+
+<div class="table-card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Order</th>
+                    <th>Label / Opsi</th>
+                    <th>Preview Badge</th>
+                    <th>Icon</th>
+                    <th>PTP?</th>
+                    <th>Aktif?</th>
+                    <th class="text-end">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in statuses %}
+                <tr>
+                    <td>{{ s.display_order }}</td>
+                    <td>
+                        <div class="fw-bold">{{ s.label }}</div>
+                        <small class="text-muted">{{ s.key }}</small>
+                    </td>
+                    <td>
+                        <span class="badge" style="background-color: {{ s.color_code }};">{{ s.label }}</span>
+                    </td>
+                    <td><i class="bi {{ s.icon }} fs-5"></i></td>
+                    <td>
+                        {% if s.is_ptp %}
+                        <span class="text-success"><i class="bi bi-check-circle-fill"></i> Ya</span>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if s.is_active %}
+                        <span class="badge bg-success">Aktif</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Non-aktif</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary me-1" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#editStatusModal{{ s.id }}">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <form method="POST" action="/settings/visit-statuses/delete/{{ s.id }}" class="d-inline" onsubmit="return confirm('Hapus status ini?')">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+
+                <!-- Edit Modal -->
+                <div class="modal fade" id="editStatusModal{{ s.id }}" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Edit Status Kunjungan</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <form method="POST" action="/settings/visit-statuses/save">
+                                <input type="hidden" name="id" value="{{ s.id }}">
+                                <div class="modal-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Label Kunjungan</label>
+                                        <input type="text" class="form-control" name="label" value="{{ s.label }}" required>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Warna (Hex)</label>
+                                            <input type="color" class="form-control form-control-color w-100" name="color_code" value="{{ s.color_code }}">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Icon (BI Class)</label>
+                                            <input type="text" class="form-control" name="icon" value="{{ s.icon }}" placeholder="bi-check-circle">
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Display Order</label>
+                                            <input type="number" class="form-control" name="display_order" value="{{ s.display_order }}">
+                                        </div>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" name="is_ptp" id="isPtp{{ s.id }}" {% if s.is_ptp %}checked{% endif %}>
+                                        <label class="form-check-label" for="isPtp{{ s.id }}">Anggap sebagai PTP (Janji Bayar)</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="is_active" id="isActive{{ s.id }}" {% if s.is_active %}checked{% endif %}>
+                                        <label class="form-check-label" for="isActive{{ s.id }}">Aktif (Muncul di Mobile)</label>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                                    <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Modal -->
+<div class="modal fade" id="addStatusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Tambah Status Kunjungan Baru</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="/settings/visit-statuses/save">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Label Kunjungan</label>
+                        <input type="text" class="form-control" name="label" placeholder="Contoh: Tutup Toko" required>
+                        <div class="form-text">Key akan otomatis dibuat dari label.</div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Warna</label>
+                            <input type="color" class="form-control form-control-color w-100" name="color_code" value="#4F46E5">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Icon (BI Class)</label>
+                            <input type="text" class="form-control" name="icon" value="bi-question-circle" placeholder="bi-check-circle">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Display Order</label>
+                            <input type="number" class="form-control" name="display_order" value="0">
+                        </div>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="is_ptp" id="isPtpAdd">
+                        <label class="form-check-label" for="isPtpAdd">Anggap sebagai PTP (Janji Bayar)</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="is_active" id="isActiveAdd" checked>
+                        <label class="form-check-label" for="isActiveAdd">Aktif (Muncul di Mobile)</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan Status</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

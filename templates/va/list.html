@@ -85,7 +85,7 @@
                 {% for vr in va_requests %}
                 <tr>
                     <td>{{ vr.id }}</td>
-                    <td><strong>{{ vr.customer.name if vr.customer else '-' }}</strong></td>
+                    <td><strong>{{ vr.customer.full_name if vr.customer else '-' }}</strong></td>
                     <td>{{ vr.agent.name if vr.agent else '-' }}</td>
                     <td class="small text-muted">{{ vr.notes or '-' }}</td>
                     <td><span class="badge badge-{{ vr.status }}">{{ vr.status | title }}</span></td>
@@ -115,7 +115,7 @@
                     <div class="modal-dialog">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title"><i class="bi bi-credit-card me-2"></i>Create VA untuk {{ vr.customer.name if vr.customer else 'Customer' }}</h5>
+                                <h5 class="modal-title"><i class="bi bi-credit-card me-2"></i>Create VA untuk {{ vr.customer.full_name if vr.customer else 'Customer' }}</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <form method="POST" action="/va-requests/{{ vr.id }}/create-va">

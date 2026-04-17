@@ -38,7 +38,7 @@ def dashboard_page(request: Request, db: Session = Depends(get_db)):
     today = datetime.now(jakarta).date()
 
     # Stats
-    total_customers = db.query(func.count(Customer.id)).scalar() or 0
+    total_customers = db.query(func.count(Customer.id)).filter(Customer.is_deleted == 0).scalar() or 0
     total_agents = db.query(func.count(User.id)).filter(User.role == "agent", User.is_active == True).scalar() or 0
 
     # Collection hari ini
@@ -58,10 +58,11 @@ def dashboard_page(request: Request, db: Session = Depends(get_db)):
     # Customer status breakdown
     status_counts = dict(
         db.query(Customer.status, func.count(Customer.id))
+        .filter(Customer.is_deleted == 0)
         .group_by(Customer.status)
         .all()
     )
-    belum = status_counts.get("belum", 0)
+    belum = status_counts.get("belum", 0) + status_counts.get("new", 0)
     janji_bayar = status_counts.get("janji_bayar", 0)
     bayar = status_counts.get("bayar", 0)
     tidak_ketemu = status_counts.get("tidak_ketemu", 0)
